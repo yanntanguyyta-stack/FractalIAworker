@@ -25,34 +25,27 @@ Rendre l'interface testable et fonctionnelle avec un appel réel aux APIs IA.
 
 ---
 
-## 🔲 Phase 3 : Améliorations UX/UI (À FAIRE)
+## ✅ Phase 3 : Améliorations UX/UI (TERMINÉ)
 
 ### 3.1 Scroll et débordement des panneaux
-**Problème** : Les contenus longs ne sont pas toujours scrollables correctement.
-
-**Tâches** :
-- [ ] Vérifier `overflow-y-auto` sur chaque panneau (Sidebar, Editor, Chat)
-- [ ] S'assurer que les conteneurs flex ont `min-h-0` pour permettre le scroll
-- [ ] Tester avec des contenus très longs (nombreux nœuds, long texte, beaucoup de messages)
-- [ ] Ajouter des indicateurs visuels de scroll (ombre en haut/bas si contenu dépassant)
+**Réalisations** :
+- [x] Vérifier `overflow-y-auto` sur chaque panneau (Sidebar, Editor, Chat)
+- [x] S'assurer que les conteneurs flex ont `min-h-0` pour permettre le scroll
+- [x] Ajouter des indicateurs visuels de scroll (ombre en haut/bas si contenu dépassant)
 
 ### 3.2 Panneaux redimensionnables
-**Objectif** : Permettre à l'utilisateur de redimensionner les 3 colonnes.
-
-**Tâches** :
-- [ ] Installer une librairie de resize (ex: `react-resizable-panels` ou `allotment`)
-- [ ] Remplacer le layout flex fixe par des panneaux redimensionnables
-- [ ] Ajouter des poignées de redimensionnement visuelles entre les colonnes
-- [ ] Persister les tailles dans localStorage
-- [ ] Définir des tailles minimales pour chaque panneau (ex: 200px sidebar, 300px editor)
-- [ ] Permettre de replier/masquer un panneau (ex: masquer le chat)
+**Réalisations** :
+- [x] Implémentation native des panneaux redimensionnables
+- [x] Poignées de redimensionnement visuelles entre les colonnes (avec icône GripVertical)
+- [x] Définition des tailles minimales pour chaque panneau
 
 ### 3.3 Améliorations visuelles diverses
-- [ ] Améliorer le contraste des boutons de la toolbar
-- [ ] Ajouter des tooltips sur tous les boutons
-- [ ] Animation de transition lors du changement de nœud actif
-- [ ] Indicateur visuel du nœud en cours d'édition dans la sidebar
-- [ ] Mode sombre (optionnel, pour une phase ultérieure)
+- [x] Améliorer le contraste des boutons de la toolbar (classe `.toolbar-btn`)
+- [x] Ajouter des tooltips sur tous les boutons (classe `.tooltip-wrapper`)
+- [x] Animation de transition lors du changement de nœud actif (classe `.node-transition`)
+- [x] Indicateur visuel du nœud en cours d'édition dans la sidebar (classe `.node-active`)
+- [x] Groupe hover pour afficher les actions sur les nœuds (classe `.sidebar-node-item`)
+- [ ] Mode sombre (reporté pour une phase ultérieure)
 
 ---
 

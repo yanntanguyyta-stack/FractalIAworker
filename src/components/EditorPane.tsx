@@ -38,8 +38,20 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   const activeNode = getActiveNode();
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
   const [copied, setCopied] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const prevNodeIdRef = useRef<string | null>(null);
+
+  // Animation lors du changement de nœud
+  useEffect(() => {
+    if (activeNode && prevNodeIdRef.current !== activeNode.id) {
+      setIsTransitioning(true);
+      const timer = setTimeout(() => setIsTransitioning(false), 250);
+      prevNodeIdRef.current = activeNode.id;
+      return () => clearTimeout(timer);
+    }
+  }, [activeNode?.id]);
 
   // Render Mermaid diagrams
   useEffect(() => {
@@ -180,7 +192,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   };
 
   return (
-    <div className={`bg-white border-r border-gray-200 flex flex-col h-full ${className}`}>
+    <div className={`bg-white border-r border-gray-200 flex flex-col h-full ${className} ${isTransitioning ? 'node-transition' : ''}`}>
       {/* Header avec métadonnées */}
       <div className="border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
@@ -214,16 +226,16 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
       </div>
 
       {/* Toolbar */}
-      <div className="border-b border-gray-200 bg-gray-50 px-2 py-1 flex items-center gap-1 flex-wrap flex-shrink-0">
+      <div className="border-b border-gray-200 bg-gray-50 px-2 py-1.5 flex items-center gap-0.5 flex-wrap flex-shrink-0">
         {toolbarButtons.map((btn, idx) =>
           btn.divider ? (
-            <div key={idx} className="w-px h-6 bg-gray-300 mx-1" />
+            <div key={idx} className="w-px h-6 bg-gray-300 mx-1.5" />
           ) : (
             <button
               key={idx}
               onClick={btn.action}
-              className="p-2 hover:bg-gray-200 rounded transition-colors"
-              title={btn.label}
+              className="toolbar-btn tooltip-wrapper"
+              data-tooltip={btn.label}
             >
               {btn.icon}
             </button>

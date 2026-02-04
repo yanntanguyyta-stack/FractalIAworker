@@ -27,12 +27,15 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     const isActive = activeNodeId === node.id;
 
     return (
-      <div key={node.id} className="select-none">
+      <div key={node.id} className="select-none sidebar-node-item">
         <div
-          className={`flex items-center gap-2 px-3 py-2 cursor-pointer rounded-md transition-colors ${
-            isActive ? 'bg-blue-100 text-blue-900' : 'hover:bg-gray-100'
+          className={`flex items-center gap-2 px-3 py-2 cursor-pointer rounded-md transition-all duration-150 ${
+            isActive 
+              ? 'node-active' 
+              : 'hover:bg-gray-100 border-l-4 border-transparent'
           }`}
           style={{ marginLeft: `${depth * 16}px` }}
+          onClick={() => selectNode(node.id)}
         >
           {hasChildren && (
             <button
@@ -40,31 +43,37 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                 e.stopPropagation();
                 toggleExpanded(node.id);
               }}
-              className="p-0 hover:bg-gray-200 rounded"
+              className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+              aria-label={isExpanded ? 'Replier' : 'Déplier'}
             >
               {isExpanded ? (
-                <ChevronDown size={16} />
+                <ChevronDown size={16} className="text-gray-500" />
               ) : (
-                <ChevronRight size={16} />
+                <ChevronRight size={16} className="text-gray-500" />
               )}
             </button>
           )}
-          {!hasChildren && <div className="w-4" />}
+          {!hasChildren && <div className="w-5" />}
 
-          <span
-            className="flex-1 truncate text-sm font-medium"
-            onClick={() => selectNode(node.id)}
-          >
+          <span className="flex-1 truncate text-sm font-medium">
             {node.heading || '(Sans titre)'}
           </span>
+
+          {/* Indicateur de type */}
+          {node.meta.contextConfig?.isGlobal && (
+            <span className="text-green-500 text-xs" title="Contexte global">🌐</span>
+          )}
+          {node.meta.agentConfig?.role && (
+            <span className="text-purple-500 text-xs" title={`Agent: ${node.meta.agentConfig.role}`}>🤖</span>
+          )}
 
           <button
             onClick={(e) => {
               e.stopPropagation();
               addChild(node.id, 'Nouveau nœud');
             }}
-            className="p-1 hover:bg-green-200 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Ajouter un enfant"
+            className="p-1 hover:bg-green-200 rounded node-action tooltip-wrapper"
+            data-tooltip="Ajouter un enfant"
           >
             <Plus size={14} className="text-green-600" />
           </button>
@@ -76,8 +85,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                 deleteNode(node.id);
               }
             }}
-            className="p-1 hover:bg-red-200 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Supprimer le nœud"
+            className="p-1 hover:bg-red-200 rounded node-action tooltip-wrapper"
+            data-tooltip="Supprimer"
           >
             <Trash2 size={14} className="text-red-600" />
           </button>
