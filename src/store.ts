@@ -39,6 +39,7 @@ interface EditorState {
   deleteNode: (nodeId: string) => void;
   getActiveNode: () => NodeData | null;
   getAllNodes: () => NodeData[];
+  getNodePath: (nodeId: string) => NodeData[]; // Breadcrumb: chemin vers un nœud
   
   // Actions IA
   setAIConfig: (config: AIConfig) => void;
@@ -156,6 +157,31 @@ export const useStore = create<EditorState>()(
   getAllNodes: () => {
     const { tree } = get();
     return flattenTree(tree);
+  },
+
+  // Obtenir le chemin (breadcrumb) vers un nœud
+  getNodePath: (nodeId: string) => {
+    const { tree } = get();
+    const path: NodeData[] = [];
+    
+    function findPath(nodes: NodeData[], currentPath: NodeData[]): boolean {
+      for (const node of nodes) {
+        const newPath = [...currentPath, node];
+        if (node.id === nodeId) {
+          path.push(...newPath);
+          return true;
+        }
+        if (node.children.length > 0) {
+          if (findPath(node.children, newPath)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    
+    findPath(tree, []);
+    return path;
   },
 
   // Mettre à jour la configuration IA

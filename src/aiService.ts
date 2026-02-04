@@ -2,19 +2,48 @@ import { NodeData } from './types';
 import { AIConfig, AIProvider, ChatMode } from './store';
 
 /**
- * Service IA pour construire le contexte sandwich
+ * Service IA pour construire le contexte sandwich hiérarchique
  * 
  * Couche 1 (Global): Contenu des nœuds marqués isGlobal: true
- * Couche 2 (Rôle Local): Role et instructions du nœud actif
- * Couche 3 (Tâche): Contenu du nœud actif
+ * Couche 2 (Ancêtres): Contexte hiérarchique des nœuds parents
+ * Couche 3 (Rôle Local): Role et instructions du nœud actif
+ * Couche 4 (Tâche): Contenu du nœud actif
  */
 
 export interface AIContextSandwich {
   globalContext: string;
+  hierarchicalContext: string; // Nouveau: contexte des ancêtres
   agentRole: string;
   agentInstructions: string;
   currentNodeContent: string;
   dependencies: NodeData[];
+  nodePath: NodeData[]; // Nouveau: chemin complet vers le nœud
+}
+
+/**
+ * Trouver le chemin vers un nœud (ancêtres)
+ */
+function findNodePath(nodes: NodeData[], targetId: string): NodeData[] {
+  const path: NodeData[] = [];
+  
+  function traverse(nodeList: NodeData[], currentPath: NodeData[]): boolean {
+    for (const node of nodeList) {
+      const newPath = [...currentPath, node];
+      if (node.id === targetId) {
+        path.push(...newPath);
+        return true;
+      }
+      if (node.children.length > 0) {
+        if (traverse(node.children, newPath)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
+  traverse(nodes, []);
+  return path;
 }
 
 /**
@@ -30,14 +59,24 @@ export function buildContextSandwich(
     .map(n => `## ${n.heading}\n${n.content}`)
     .join('\n\n');
 
-  // Couche 2: Configuration du rôle local
+  // Couche 2: Contexte hiérarchique (chemin des ancêtres)
+  const nodePath = findNodePath(allNodes, activeNode.id);
+  const ancestors = nodePath.slice(0, -1); // Exclure le nœud actif
+  const hierarchicalContext = ancestors
+    .map((node, index) => {
+      const indent = '  '.repeat(index);
+      return `${indent}${'#'.repeat(node.headingDepth)} ${node.heading}\n${indent}${node.content.split('\n').slice(0, 3).join('\n' + indent)}...`;
+    })
+    .join('\n\n');
+
+  // Couche 3: Configuration du rôle local
   const agentRole = activeNode.meta.agentConfig?.role || 'Assistant';
   const agentInstructions = activeNode.meta.agentConfig?.instructions || '';
 
-  // Couche 3: Contenu du nœud actif
+  // Couche 4: Contenu du nœud actif
   const currentNodeContent = activeNode.content;
 
-  // Gérer les dépendances
+  // Gérer les dépendances explicites
   const dependencies: NodeData[] = [];
   if (activeNode.meta.contextConfig?.dependencies) {
     for (const depId of activeNode.meta.contextConfig.dependencies) {
@@ -50,10 +89,12 @@ export function buildContextSandwich(
 
   return {
     globalContext,
+    hierarchicalContext,
     agentRole,
     agentInstructions,
     currentNodeContent,
     dependencies,
+    nodePath,
   };
 }
 
@@ -133,6 +174,23 @@ Tu es en mode discussion. Tu peux être conversationnel et explicatif.
     prompt += `## CONTEXTE GLOBAL DU PROJET\n${context.globalContext}\n\n`;
   }
 
+  // Nouveau: Contexte hiérarchique (ancêtres)
+  if (context.hierarchicalContext) {
+    prompt += `## POSITION DANS LA HIÉRARCHIE
+Tu travailles sur un nœud situé dans la structure suivante:
+${context.hierarchicalContext}
+
+Le nœud actif est le dernier de cette hiérarchie. Garde ce contexte parent en tête pour tes réponses.
+
+`;
+  }
+
+  // Afficher le chemin du nœud
+  if (context.nodePath.length > 1) {
+    const pathString = context.nodePath.map(n => n.heading).join(' > ');
+    prompt += `**Chemin**: ${pathString}\n\n`;
+  }
+
   if (context.dependencies.length > 0) {
     prompt += `## CONTEXTE DÉPENDANT\n`;
     context.dependencies.forEach(dep => {
@@ -148,10 +206,19 @@ Tu es en mode discussion. Tu peux être conversationnel et explicatif.
  * Construire le message utilisateur avec le contexte du nœud actif
  */
 export function buildUserMessage(context: AIContextSandwich, userQuery: string): string {
-  let message = `Voici le contenu actuel du nœud:\n\n`;
-  message += `**Nœud Actif**: ${userQuery}\n\n`;
-  message += `**Contenu Actuel**:\n${context.currentNodeContent}\n\n`;
-  message += `Réponds en gardant ce contexte en tête.`;
+  const currentNode = context.nodePath[context.nodePath.length - 1];
+  const nodeTitle = currentNode?.heading || 'Nœud actif';
+  
+  let message = `## Nœud: ${nodeTitle}\n\n`;
+  message += `**Votre demande**: ${userQuery}\n\n`;
+  
+  if (context.currentNodeContent) {
+    message += `**Contenu actuel du nœud**:\n${context.currentNodeContent}\n\n`;
+  } else {
+    message += `*Ce nœud est vide pour l'instant.*\n\n`;
+  }
+  
+  message += `Réponds en tenant compte de la position de ce nœud dans la hiérarchie du document.`;
   return message;
 }
 

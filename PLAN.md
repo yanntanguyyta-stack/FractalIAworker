@@ -52,42 +52,31 @@ Rendre l'interface testable et fonctionnelle avec un appel réel aux APIs IA.
 ## 🔲 Phase 4 : Règles de réponse IA (À FAIRE)
 
 ### 4.1 Instructions système pour l'intégration au document
-**Problème** : L'IA peut générer des réponses verbeuses avec des explications inutiles pour le document final.
+## ✅ Phase 4 : Structure Fractale & Contexte IA (TERMINÉ)
 
-**Objectif** : Définir des règles pour que l'IA génère du contenu "prêt à intégrer".
+### 4.1 Hiérarchie multi-niveaux (fractale)
+**Réalisations** :
+- [x] Structure récursive jusqu'à 6 niveaux de profondeur (H1 à H6)
+- [x] Données mock avec 4 niveaux de hiérarchie
+- [x] Couleurs distinctes par niveau dans la sidebar
+- [x] Indicateur de niveau (H1, H2, H3, H4...)
+- [x] Compteur d'enfants par nœud
+- [x] Boutons "Tout déplier / Tout replier"
 
-**Tâches** :
-- [ ] Ajouter un mode "Rédaction" vs "Discussion" dans le chat
-  - **Discussion** : Réponses explicatives, conversationnelles
-  - **Rédaction** : Réponses concises, directement intégrables au document
+### 4.2 Navigation et fil d'Ariane (Breadcrumb)
+**Réalisations** :
+- [x] Fil d'Ariane cliquable dans l'éditeur
+- [x] Navigation vers les nœuds parents
+- [x] Fonction `getNodePath()` dans le store
+- [x] Affichage du niveau et du nombre d'enfants
 
-- [ ] Créer des instructions système spécifiques :
-  ```
-  MODE RÉDACTION :
-  - Réponds UNIQUEMENT avec le contenu à intégrer
-  - Pas d'introduction ("Voici...", "Bien sûr...")
-  - Pas de conclusion ("N'hésite pas à...")
-  - Format Markdown propre et structuré
-  - Utilise les listes, tableaux, et titres appropriés
-  ```
-
-- [ ] Bouton "Intégrer au document" amélioré :
-  - Prévisualisation avant intégration
-  - Choix de l'emplacement (remplacer, ajouter au début, ajouter à la fin)
-  - Option de reformatage automatique
-
-### 4.2 Templates de prompts
-- [ ] Créer des raccourcis de prompts par type de section :
-  - "Développe ce point" → génère un paragraphe détaillé
-  - "Résume" → synthétise le contenu existant
-  - "Ajoute des exemples" → enrichit avec des cas concrets
-  - "Crée un tableau comparatif" → format tableau
-  - "Génère un diagramme" → code Mermaid
-
-### 4.3 Historique et contexte
-- [ ] Conserver l'historique de conversation par nœud
-- [ ] Permettre de "reprendre" une conversation précédente
-- [ ] Option pour inclure/exclure l'historique dans le contexte IA
+### 4.3 Contexte IA hiérarchique
+**Réalisations** :
+- [x] Contexte sandwich enrichi avec les ancêtres
+- [x] L'IA reçoit le chemin complet dans la hiérarchie
+- [x] Instructions tenant compte de la position du nœud
+- [x] Mode Rédaction vs Discussion (déjà implémenté en Phase 2)
+- [x] Templates de prompts rapides (déjà implémenté en Phase 2)
 
 ---
 

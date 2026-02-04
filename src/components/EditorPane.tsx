@@ -18,6 +18,8 @@ import {
   Edit3,
   Copy,
   Check,
+  ChevronRight,
+  Home,
 } from 'lucide-react';
 
 // Initialiser Mermaid
@@ -34,8 +36,9 @@ interface EditorPaneProps {
 type ViewMode = 'edit' | 'preview' | 'split';
 
 const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
-  const { getActiveNode, updateNodeContent } = useStore();
+  const { getActiveNode, updateNodeContent, getNodePath, selectNode, activeNodeId } = useStore();
   const activeNode = getActiveNode();
+  const nodePath = activeNodeId ? getNodePath(activeNodeId) : [];
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
   const [copied, setCopied] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -193,6 +196,29 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
 
   return (
     <div className={`bg-white border-r border-gray-200 flex flex-col h-full ${className} ${isTransitioning ? 'node-transition' : ''}`}>
+      {/* Breadcrumb - Fil d'Ariane */}
+      {nodePath.length > 1 && (
+        <div className="border-b border-gray-100 bg-gray-50 px-3 py-1.5 flex items-center gap-1 text-xs overflow-x-auto flex-shrink-0">
+          <Home size={12} className="text-gray-400 flex-shrink-0" />
+          {nodePath.map((node, index) => (
+            <React.Fragment key={node.id}>
+              {index > 0 && <ChevronRight size={12} className="text-gray-300 flex-shrink-0" />}
+              <button
+                onClick={() => selectNode(node.id)}
+                className={`px-1.5 py-0.5 rounded transition-colors truncate max-w-[120px] ${
+                  index === nodePath.length - 1 
+                    ? 'bg-blue-100 text-blue-700 font-medium' 
+                    : 'hover:bg-gray-200 text-gray-600'
+                }`}
+                title={node.heading}
+              >
+                {node.heading}
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
       {/* Header avec métadonnées */}
       <div className="border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
@@ -208,9 +234,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-600">
+        <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
           <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-            {activeNode.meta.type}
+            H{activeNode.headingDepth} • {activeNode.meta.type}
           </span>
           {activeNode.meta.agentConfig?.role && (
             <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
@@ -220,6 +246,11 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
           {activeNode.meta.contextConfig?.isGlobal && (
             <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
               ✓ Global
+            </span>
+          )}
+          {activeNode.children.length > 0 && (
+            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">
+              📁 {activeNode.children.length} enfant(s)
             </span>
           )}
         </div>
