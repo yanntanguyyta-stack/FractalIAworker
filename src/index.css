@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply box-border;
+}
+
+html,
+body,
+#root {
+  @apply h-full w-full m-0 p-0;
+}
+
+body {
+  @apply bg-gray-50 font-sans antialiased;
+}
+
+/* Améliorer le scroll personnalisé */
+::-webkit-scrollbar {
+  @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded-full hover:bg-gray-500;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    @apply opacity-0 translate-y-2;
+  }
+  to {
+    @apply opacity-100 translate-y-0;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    @apply opacity-0 translate-x-4;
+  }
+  to {
+    @apply opacity-100 translate-x-0;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-in-out;
+}
+
+/* react-resizable-panels styles */
+[data-panel-group] {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+[data-panel] {
+  overflow: hidden;
+}
+
+[data-resize-handle] {
+  @apply bg-gray-300 hover:bg-blue-500 active:bg-blue-600 transition-colors flex-shrink-0;
+  position: relative;
+  z-index: 10;
+}
+
+[data-resize-handle]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+
+[data-resize-handle][data-resize-handle-active] {
+  @apply bg-blue-600;
+}
+
+[data-panel-group-direction="horizontal"] > [data-resize-handle] {
+  @apply w-2 cursor-col-resize;
+}
+
+[data-panel-group-direction="vertical"] > [data-resize-handle] {
+  @apply h-2 cursor-row-resize;
+}
