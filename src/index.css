@@ -206,15 +206,12 @@ body {
   visibility: visible;
 }
 
-/* Groupe hover pour sidebar */
-.sidebar-node-item {
-  @apply group;
-}
-
+/* Groupe hover pour sidebar - le hover est géré directement sans @apply group */
 .sidebar-node-item .node-action {
-  @apply opacity-0 transition-opacity duration-150;
+  opacity: 0;
+  transition: opacity 150ms ease;
 }
 
 .sidebar-node-item:hover .node-action {
-  @apply opacity-100;
+  opacity: 1;
 }
