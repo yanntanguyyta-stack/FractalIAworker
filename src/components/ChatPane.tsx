@@ -14,18 +14,32 @@ interface ChatPaneProps {
   onOpenSettings?: () => void;
 }
 
-// Templates de prompts rapides
+// Templates de prompts rapides - organisés par catégorie
 const promptTemplates = [
-  { icon: '📝', label: 'Développe ce point', prompt: 'Développe et détaille le contenu de cette section de manière approfondie.' },
-  { icon: '📋', label: 'Résume', prompt: 'Fais un résumé concis du contenu actuel de cette section.' },
-  { icon: '💡', label: 'Ajoute des exemples', prompt: 'Ajoute des exemples concrets et pertinents pour illustrer les points de cette section.' },
-  { icon: '📊', label: 'Crée un tableau', prompt: 'Crée un tableau Markdown récapitulatif basé sur le contenu de cette section.' },
-  { icon: '🔀', label: 'Diagramme Mermaid', prompt: 'Génère un diagramme Mermaid pour visualiser les concepts de cette section.' },
-  { icon: '✅', label: 'Liste de tâches', prompt: 'Transforme le contenu en une liste de tâches actionables.' },
+  // Rédaction
+  { icon: '📝', label: 'Développe ce point', prompt: 'Développe et détaille le contenu de cette section de manière approfondie.', category: 'redaction' },
+  { icon: '📋', label: 'Résume', prompt: 'Fais un résumé concis du contenu actuel de cette section.', category: 'redaction' },
+  { icon: '💡', label: 'Ajoute des exemples', prompt: 'Ajoute des exemples concrets et pertinents pour illustrer les points de cette section.', category: 'redaction' },
+  { icon: '✅', label: 'Liste de tâches', prompt: 'Transforme le contenu en une liste de tâches actionables avec des cases à cocher Markdown (- [ ]).', category: 'redaction' },
+  { icon: '🔍', label: 'Améliore le style', prompt: 'Améliore le style et la clarté du texte actuel tout en conservant le sens.', category: 'redaction' },
+  
+  // Tableaux
+  { icon: '📊', label: 'Tableau récapitulatif', prompt: 'Crée un tableau Markdown récapitulatif basé sur le contenu de cette section.', category: 'tableau' },
+  { icon: '📈', label: 'Tableau comparatif', prompt: 'Crée un tableau Markdown comparatif (avantages/inconvénients ou comparaison de solutions).', category: 'tableau' },
+  { icon: '📅', label: 'Planning/Timeline', prompt: 'Crée un tableau Markdown avec un planning ou une timeline des étapes.', category: 'tableau' },
+  
+  // Diagrammes Mermaid
+  { icon: '🔀', label: 'Flowchart', prompt: 'Génère un diagramme Mermaid de type flowchart (graph TD) pour visualiser le processus ou les étapes décrites. Utilise des formes appropriées : rectangles pour les actions, losanges pour les décisions, cercles pour début/fin.', category: 'mermaid' },
+  { icon: '🔄', label: 'Diagramme séquence', prompt: 'Génère un diagramme Mermaid de type séquence (sequenceDiagram) pour illustrer les interactions entre les acteurs ou systèmes mentionnés.', category: 'mermaid' },
+  { icon: '🧠', label: 'Mind Map', prompt: 'Génère un diagramme Mermaid de type mindmap pour organiser les concepts et idées de cette section de façon hiérarchique.', category: 'mermaid' },
+  { icon: '📦', label: 'Diagramme de classes', prompt: 'Génère un diagramme Mermaid de type classDiagram pour représenter les entités et leurs relations.', category: 'mermaid' },
+  { icon: '🗓️', label: 'Diagramme Gantt', prompt: 'Génère un diagramme Mermaid de type gantt pour planifier les tâches et leurs durées.', category: 'mermaid' },
+  { icon: '🥧', label: 'Graphique circulaire', prompt: 'Génère un diagramme Mermaid de type pie pour représenter les proportions ou répartitions mentionnées.', category: 'mermaid' },
+  { icon: '🔄', label: 'État/Transitions', prompt: 'Génère un diagramme Mermaid de type stateDiagram-v2 pour représenter les différents états et transitions.', category: 'mermaid' },
 ];
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
-  const { getActiveNode, getAllNodes, updateNodeContent, aiConfig, setChatMode } = useStore();
+  const { getActiveNode, getAllNodes, updateNodeContent, aiConfig, setChatMode, setAIConfig } = useStore();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -128,10 +142,17 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
       {/* Header */}
       <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50 p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-bold text-gray-900">Assistant IA</h3>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-bold text-gray-900 truncate" title={activeNode.heading}>
+              📄 {activeNode.heading}
+            </h3>
+            <p className="text-sm text-purple-600 font-medium truncate" title={activeNode.meta.agentConfig?.role || 'Assistant IA'}>
+              🤖 <span className="italic">{activeNode.meta.agentConfig?.role || 'Assistant IA (rôle par défaut)'}</span>
+            </p>
+          </div>
           <button
             onClick={onOpenSettings}
-            className="p-2 hover:bg-indigo-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-indigo-100 rounded-lg transition-colors flex-shrink-0 ml-2"
             title="Configurer l'IA"
           >
             <Settings size={18} className="text-indigo-600" />
@@ -167,19 +188,36 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          {activeNode.meta.agentConfig?.role && (
-            <span className="text-purple-700">
-              👤 <strong>{activeNode.meta.agentConfig.role}</strong>
-            </span>
-          )}
-          <span className="text-gray-400">•</span>
-          <span className={`px-2 py-0.5 rounded-full ${
+          <div className={`relative flex items-center gap-1 px-2 py-0.5 rounded-full ${
             aiConfig.provider === 'gemini' 
               ? 'bg-blue-100 text-blue-700' 
               : 'bg-green-100 text-green-700'
           }`}>
-            {aiConfig.provider === 'gemini' ? '🔮 ' : '🤖 '}{aiConfig.model}
-          </span>
+            <span>{aiConfig.provider === 'gemini' ? '🔮 ' : '🤖 '}</span>
+            <select
+              value={aiConfig.model}
+              onChange={(e) => setAIConfig({ ...aiConfig, model: e.target.value })}
+              className="bg-transparent border-none outline-none text-xs font-medium appearance-none cursor-pointer pr-4"
+              style={{ backgroundImage: 'none' }}
+            >
+              {aiConfig.provider === 'gemini' ? (
+                <>
+                  <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
+                  <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                  <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                </>
+              ) : (
+                <>
+                  <option value="gpt-4o-mini">GPT-4o Mini</option>
+                  <option value="gpt-4o">GPT-4o</option>
+                  <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                </>
+              )}
+            </select>
+            <ChevronDown size={10} className="absolute right-2 pointer-events-none" />
+          </div>
           {aiConfig.chatMode === 'redaction' && (
             <>
               <span className="text-gray-400">•</span>
@@ -279,20 +317,58 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Templates rapides */}
+      {/* Templates rapides - organisés par catégorie */}
       {showTemplates && (
-        <div className="border-t border-gray-200 bg-white p-3 flex-shrink-0">
-          <div className="grid grid-cols-2 gap-2">
-            {promptTemplates.map((template) => (
-              <button
-                key={template.label}
-                onClick={() => handleUseTemplate(template.prompt)}
-                className="flex items-center gap-2 p-2 text-left text-xs bg-gray-50 hover:bg-purple-50 rounded-lg transition-colors"
-              >
-                <span>{template.icon}</span>
-                <span className="font-medium">{template.label}</span>
-              </button>
-            ))}
+        <div className="border-t border-gray-200 bg-white p-3 flex-shrink-0 max-h-64 overflow-y-auto">
+          {/* Rédaction */}
+          <div className="mb-3">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">✍️ Rédaction</h4>
+            <div className="grid grid-cols-2 gap-1.5">
+              {promptTemplates.filter(t => t.category === 'redaction').map((template) => (
+                <button
+                  key={template.label}
+                  onClick={() => handleUseTemplate(template.prompt)}
+                  className="flex items-center gap-2 p-2 text-left text-xs bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border border-transparent rounded-lg transition-colors"
+                >
+                  <span>{template.icon}</span>
+                  <span className="font-medium truncate">{template.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Tableaux */}
+          <div className="mb-3">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📊 Tableaux</h4>
+            <div className="grid grid-cols-2 gap-1.5">
+              {promptTemplates.filter(t => t.category === 'tableau').map((template) => (
+                <button
+                  key={template.label}
+                  onClick={() => handleUseTemplate(template.prompt)}
+                  className="flex items-center gap-2 p-2 text-left text-xs bg-green-50 hover:bg-green-100 hover:border-green-200 border border-transparent rounded-lg transition-colors"
+                >
+                  <span>{template.icon}</span>
+                  <span className="font-medium truncate">{template.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Diagrammes Mermaid */}
+          <div>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📐 Diagrammes Mermaid</h4>
+            <div className="grid grid-cols-2 gap-1.5">
+              {promptTemplates.filter(t => t.category === 'mermaid').map((template) => (
+                <button
+                  key={template.label}
+                  onClick={() => handleUseTemplate(template.prompt)}
+                  className="flex items-center gap-2 p-2 text-left text-xs bg-purple-50 hover:bg-purple-100 hover:border-purple-200 border border-transparent rounded-lg transition-colors"
+                >
+                  <span>{template.icon}</span>
+                  <span className="font-medium truncate">{template.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

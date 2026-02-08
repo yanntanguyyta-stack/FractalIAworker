@@ -20,9 +20,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   // Modèles disponibles par provider
   const models = {
     gemini: [
-      { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (rapide)' },
-      { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (avancé)' },
-      { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (dernière version)' },
+      { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview (SOTA)' },
+      { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview (Fast)' },
+      { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Exp (Legacy)' },
+      { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Stable)' },
     ],
     openai: [
       { value: 'gpt-4o-mini', label: 'GPT-4o Mini (économique)' },

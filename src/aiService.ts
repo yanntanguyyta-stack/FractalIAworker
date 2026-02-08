@@ -233,6 +233,10 @@ async function callGeminiAPI(
 ): Promise<string> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+  // Configuration spécifique pour Gemini 3
+  const isGemini3 = model.includes('gemini-3');
+  const temperature = isGemini3 ? 1.0 : 0.7;
+
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -249,8 +253,8 @@ async function callGeminiAPI(
         },
       ],
       generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 1024,
+        temperature: temperature,
+        maxOutputTokens: 2048, // Augmenté pour Gemini 3
       },
     }),
   });

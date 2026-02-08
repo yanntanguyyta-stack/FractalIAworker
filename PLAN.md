@@ -82,19 +82,30 @@ Rendre l'interface testable et fonctionnelle avec un appel réel aux APIs IA.
 
 ## 🔲 Phase 5 : Fonctionnalités avancées (FUTUR)
 
-### 5.1 Collaboration et export
+### 5.1 Import intelligent de fichiers
+**Objectif** : Permettre l'importation de fichiers externes avec formatage IA automatique pour intégration au document.
+
+- [ ] Interface d'upload de fichiers (drag & drop + sélecteur)
+- [ ] Support des formats : TXT, MD, PDF, DOCX, HTML
+- [ ] Parsing et extraction du contenu textuel
+- [ ] Formatage IA : restructuration en Markdown conforme à la hiérarchie du document
+- [ ] Prévisualisation avant intégration
+- [ ] Choix du nœud de destination dans l'arborescence
+- [ ] Option de création automatique de sous-nœuds depuis les sections détectées
+
+### 5.2 Collaboration et export
 - [ ] Export en PDF
 - [ ] Export en HTML standalone
 - [ ] Export en DOCX (optionnel)
 - [ ] Partage de document via lien (nécessite backend)
 
-### 5.2 Gestion des nœuds
+### 5.3 Gestion des nœuds
 - [ ] Drag & Drop pour réorganiser les nœuds
 - [ ] Copier/Coller des nœuds
 - [ ] Recherche dans tous les nœuds
 - [ ] Filtrage par type de nœud
 
-### 5.3 IA avancée
+### 5.4 IA avancée
 - [ ] Génération automatique de todo-list depuis le contenu
 - [ ] Détection de sections incomplètes
 - [ ] Suggestions proactives de l'IA

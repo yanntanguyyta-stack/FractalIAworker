@@ -14,11 +14,20 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ className = '' }) => {
-  const { loadMarkdown, tree, saveToMarkdown, aiConfig } = useStore();
+  const { loadMarkdown, tree, saveToMarkdown, aiConfig, setAIConfig } = useStore();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newDocWizardOpen, setNewDocWizardOpen] = useState(false);
   
+  // Migration des anciens noms de modèles (correction automatique)
+  useEffect(() => {
+    if (aiConfig.model === 'gemini-3.0-pro') {
+      setAIConfig({ ...aiConfig, model: 'gemini-3-pro-preview' });
+    } else if (aiConfig.model === 'gemini-3.0-flash') {
+      setAIConfig({ ...aiConfig, model: 'gemini-3-flash-preview' });
+    }
+  }, [aiConfig, setAIConfig]);
+
   // État pour les largeurs des panneaux (en pourcentage)
   const [sidebarWidth, setSidebarWidth] = useState(20);
   const [editorWidth, setEditorWidth] = useState(45);
