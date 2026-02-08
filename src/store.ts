@@ -250,7 +250,8 @@ export const useStore = create<EditorState>()(
     const { tree } = get();
     const node = findNodeById(tree, nodeId);
     if (node) {
-      const evaluation = { ...defaultEvaluation, ...node.meta.evaluation, ...updates };
+      const baseEvaluation = node.meta.evaluation ?? defaultEvaluation;
+      const evaluation = { ...baseEvaluation, ...updates };
       const updatedMeta = { ...node.meta, evaluation };
       const updated = updateNodeInTree(tree, nodeId, { meta: updatedMeta });
       set({ tree: updated });

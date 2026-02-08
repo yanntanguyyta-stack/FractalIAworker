@@ -15,6 +15,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [assessmentEnabled, setAssessmentEnabled] = React.useState(assessmentConfig.enabled);
   const [assessmentQuestion, setAssessmentQuestion] = React.useState(assessmentConfig.question);
   const [saved, setSaved] = React.useState(false);
+  const isApiKeyMissing = !apiKey.trim();
 
   // Modèles disponibles par provider
   const models = {
@@ -237,7 +238,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 transition-all ${
               saved
                 ? 'bg-green-500 text-white'
-                : apiKey.trim()
+                : !isApiKeyMissing
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                 : 'bg-orange-500 text-white hover:bg-orange-600'
             }`}
@@ -248,7 +249,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 Enregistré !
               </>
             ) : (
-              'Enregistrer'
+              isApiKeyMissing ? 'Enregistrer (sans clé)' : 'Enregistrer'
             )}
           </button>
         </div>
