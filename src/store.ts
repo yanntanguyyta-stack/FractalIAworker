@@ -30,6 +30,7 @@ interface EditorState {
   tree: NodeData[];
   activeNodeId: string | null;
   markdown: string;
+  clipboardNode: NodeData | null;
   
   // Configuration IA
   aiConfig: AIConfig;
@@ -43,6 +44,9 @@ interface EditorState {
   updateNodeMeta: (nodeId: string, updates: Partial<NodeData['meta']>) => void;
   addChild: (parentId: string, heading: string) => void;
   deleteNode: (nodeId: string) => void;
+  copyNode: (nodeId: string) => void;
+  pasteNode: (targetId?: string | null) => boolean;
+  moveNode: (nodeId: string, targetId?: string | null) => boolean;
   getActiveNode: () => NodeData | null;
   getAllNodes: () => NodeData[];
   getNodePath: (nodeId: string) => NodeData[]; // Breadcrumb: chemin vers un nœud
@@ -59,6 +63,82 @@ interface EditorState {
 // Générer un ID simple
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+const MAX_HEADING_DEPTH = 6;
+
+function getSubtreeMaxDepth(node: NodeData): number {
+  let maxDepth = node.headingDepth;
+  for (const child of node.children) {
+    maxDepth = Math.max(maxDepth, getSubtreeMaxDepth(child));
+  }
+  return maxDepth;
+}
+
+function adjustNodeDepth(node: NodeData, depthDelta: number): NodeData {
+  return {
+    ...node,
+    headingDepth: node.headingDepth + depthDelta,
+    children: node.children.map((child: NodeData) => adjustNodeDepth(child, depthDelta)),
+  };
+}
+
+function cloneNodeWithNewIds(node: NodeData, depthDelta: number): NodeData {
+  const newMetaId = generateId();
+  return {
+    ...node,
+    id: generateId(),
+    headingDepth: node.headingDepth + depthDelta,
+    meta: { ...node.meta, id: newMetaId },
+    children: node.children.map((child: NodeData) => cloneNodeWithNewIds(child, depthDelta)),
+  };
+}
+
+function isNodeInSubtree(node: NodeData, targetId: string): boolean {
+  if (node.id === targetId) return true;
+  return node.children.some((child: NodeData) => isNodeInSubtree(child, targetId));
+}
+
+function removeNodeById(nodes: NodeData[], nodeId: string): { nodes: NodeData[]; removed: NodeData | null } {
+  let removed: NodeData | null = null;
+  const updated = nodes
+    .filter(node => {
+      if (node.id === nodeId) {
+        removed = node;
+        return false;
+      }
+      return true;
+    })
+    .map(node => {
+      if (node.children.length === 0) {
+        return node;
+      }
+      const result = removeNodeById(node.children, nodeId);
+      if (result.removed) {
+        removed = result.removed;
+      }
+      if (result.nodes === node.children) {
+        return node;
+      }
+      return { ...node, children: result.nodes };
+    });
+
+  return { nodes: updated, removed };
+}
+
+function insertNode(nodes: NodeData[], targetId: string | null, nodeToInsert: NodeData): NodeData[] {
+  if (!targetId) {
+    return [...nodes, nodeToInsert];
+  }
+  return nodes.map(node => {
+    if (node.id === targetId) {
+      return { ...node, children: [...node.children, nodeToInsert] };
+    }
+    if (node.children.length > 0) {
+      return { ...node, children: insertNode(node.children, targetId, nodeToInsert) };
+    }
+    return node;
+  });
 }
 
 // Configuration IA par défaut
@@ -101,6 +181,7 @@ export const useStore = create<EditorState>()(
       tree: [],
       activeNodeId: null,
       markdown: '',
+      clipboardNode: null,
       aiConfig: defaultAIConfig,
       assessmentConfig: defaultAssessmentConfig,
 
@@ -185,6 +266,56 @@ export const useStore = create<EditorState>()(
     const updated = removeNode(tree);
     const newActiveId = activeNodeId === nodeId ? (updated.length > 0 ? updated[0].id : null) : activeNodeId;
     set({ tree: updated, activeNodeId: newActiveId });
+  },
+
+  copyNode: (nodeId: string) => {
+    const { tree } = get();
+    const node = findNodeById(tree, nodeId);
+    if (node) {
+      const snapshot = JSON.parse(JSON.stringify(node)) as NodeData;
+      set({ clipboardNode: snapshot });
+    }
+  },
+
+  pasteNode: (targetId: string | null = null) => {
+    const { tree, clipboardNode } = get();
+    if (!clipboardNode) return false;
+    const targetNode = targetId ? findNodeById(tree, targetId) : null;
+    if (targetId && !targetNode) return false;
+    const newDepth = targetNode ? targetNode.headingDepth + 1 : 1;
+    const maxDepth = getSubtreeMaxDepth(clipboardNode);
+    const depthDelta = newDepth - clipboardNode.headingDepth;
+    if (newDepth < 1 || newDepth + (maxDepth - clipboardNode.headingDepth) > MAX_HEADING_DEPTH) {
+      return false;
+    }
+    const clonedNode = cloneNodeWithNewIds(clipboardNode, depthDelta);
+    const updated = insertNode(tree, targetId, clonedNode);
+    set({ tree: updated });
+    return true;
+  },
+
+  moveNode: (nodeId: string, targetId: string | null = null) => {
+    const { tree } = get();
+    if (nodeId === targetId) return false;
+    const node = findNodeById(tree, nodeId);
+    if (!node) return false;
+    if (targetId && isNodeInSubtree(node, targetId)) {
+      return false;
+    }
+    const targetNode = targetId ? findNodeById(tree, targetId) : null;
+    if (targetId && !targetNode) return false;
+    const newDepth = targetNode ? targetNode.headingDepth + 1 : 1;
+    const maxDepth = getSubtreeMaxDepth(node);
+    if (newDepth < 1 || newDepth + (maxDepth - node.headingDepth) > MAX_HEADING_DEPTH) {
+      return false;
+    }
+    const depthDelta = newDepth - node.headingDepth;
+    const adjustedNode = adjustNodeDepth(node, depthDelta);
+    const removedResult = removeNodeById(tree, nodeId);
+    if (!removedResult.removed) return false;
+    const updated = insertNode(removedResult.nodes, targetId, adjustedNode);
+    set({ tree: updated });
+    return true;
   },
 
   // Obtenir le nœud actif
