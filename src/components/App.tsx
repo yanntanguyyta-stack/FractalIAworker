@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useStore } from '../store';
-import { treeToMarkdown } from '../markdownEngine';
 import { INITIAL_MARKDOWN } from '../mockData';
 import Sidebar from './Sidebar';
 import EditorPane from './EditorPane';
 import ChatPane from './ChatPane';
 import SettingsModal from './SettingsModal';
 import NewDocumentWizard from './NewDocumentWizard';
-import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical } from 'lucide-react';
+import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer } from 'lucide-react';
+import { buildHtmlDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
 
 interface AppProps {
   className?: string;
@@ -18,6 +18,10 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newDocWizardOpen, setNewDocWizardOpen] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const dragCounter = useRef(0);
   
   // État pour les largeurs des panneaux (en pourcentage)
   const [sidebarWidth, setSidebarWidth] = useState(20);
@@ -25,8 +29,19 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef<'sidebar' | 'editor' | null>(null);
 
-  // Charger les données mock au premier rendu
+  // Charger les données mock ou partagées au premier rendu
   useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#share=')) {
+      try {
+        const payload = hash.replace('#share=', '');
+        const markdown = decodeMarkdownFromShare(payload);
+        loadMarkdown(markdown);
+        return;
+      } catch (error) {
+        console.error('Erreur lors du décodage du lien partagé:', error);
+      }
+    }
     loadMarkdown(INITIAL_MARKDOWN);
   }, []);
 
@@ -71,27 +86,104 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     };
   }, [handleMouseMove, handleMouseUp]);
 
-  const handleDownloadMarkdown = () => {
-    const markdown = saveToMarkdown();
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const closeMenu = () => setShowExportMenu(false);
+    document.addEventListener('click', closeMenu);
+    return () => document.removeEventListener('click', closeMenu);
+  }, [showExportMenu]);
+
+  const getExportTitle = () => tree[0]?.heading?.trim() || 'document-irlm';
+
+  const triggerDownload = (content: string, filename: string, type: string) => {
     const element = document.createElement('a');
-    const file = new Blob([markdown], { type: 'text/markdown' });
+    const file = new Blob([content], { type });
     element.href = URL.createObjectURL(file);
-    element.download = 'project.md';
+    element.download = filename;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
   };
 
+  const handleExportMarkdown = () => {
+    const markdown = saveToMarkdown();
+    triggerDownload(markdown, `${getExportTitle()}.md`, 'text/markdown');
+  };
+
+  const handleExportHtml = () => {
+    const markdown = saveToMarkdown();
+    const html = buildHtmlDocument(markdown, getExportTitle());
+    triggerDownload(html, `${getExportTitle()}.html`, 'text/html');
+  };
+
+  const handleExportDocx = () => {
+    const markdown = saveToMarkdown();
+    const html = buildHtmlDocument(markdown, getExportTitle());
+    triggerDownload(
+      html,
+      `${getExportTitle()}.docx`,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+  };
+
+  const handleExportPdf = () => {
+    const markdown = saveToMarkdown();
+    const html = buildHtmlDocument(markdown, getExportTitle());
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Impossible d’ouvrir la fenêtre d’impression. Vérifiez votre bloqueur de pop-up.');
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
+  };
+
+  const handleShareLink = async () => {
+    const markdown = saveToMarkdown();
+    const payload = encodeMarkdownForShare(markdown);
+    const shareUrl = `${window.location.origin}${window.location.pathname}#share=${payload}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: getExportTitle(),
+          text: 'Partage du document IRLM',
+          url: shareUrl,
+        });
+        return;
+      } catch (error) {
+        console.warn('Partage annulé ou indisponible:', error);
+      }
+    }
+    await navigator.clipboard.writeText(shareUrl);
+    alert('Lien de partage copié dans le presse-papiers.');
+  };
+
+  const handleImportFile = async (file: File) => {
+    setIsImporting(true);
+    try {
+      const markdown = await importFileToMarkdown(file);
+      loadMarkdown(markdown);
+    } catch (error) {
+      console.error('Erreur lors de la lecture du fichier:', error);
+      const message = error instanceof Error ? error.message : 'Impossible d’importer ce fichier.';
+      alert(`Erreur d’import : ${message}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleUploadMarkdown = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      try {
-        const text = await file.text();
-        loadMarkdown(text);
-      } catch (error) {
-        console.error('Erreur lors de la lecture du fichier:', error);
-        alert('Erreur: Impossible de lire le fichier.');
-      }
+      await handleImportFile(file);
+    }
+    if (e.target.value) {
+      e.target.value = '';
     }
   };
 
@@ -101,8 +193,41 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     }
   };
 
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+    dragCounter.current += 1;
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      setIsDragActive(false);
+    }
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+    dragCounter.current = 0;
+    setIsDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      await handleImportFile(file);
+    }
+  };
+
   return (
-    <div className={`w-full h-screen bg-slate-100 flex flex-col ${className}`}>
+    <div
+      className={`w-full h-screen bg-slate-100 flex flex-col relative ${className}`}
+      onDragEnter={handleDragEnter}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Top Bar */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 text-white px-6 py-4 shadow-lg">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -126,20 +251,80 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
-              title="Charger un fichier Markdown"
+              title="Importer un fichier (Markdown, PDF, DOCX)"
             >
               <Upload size={18} />
-              Charger
+              Importer
             </button>
 
-            <button
-              onClick={handleDownloadMarkdown}
-              className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
-              title="Télécharger le Markdown"
-            >
-              <Download size={18} />
-              Télécharger
-            </button>
+            <div className="relative">
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setShowExportMenu((current) => !current);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
+                title="Exporter ou partager"
+              >
+                <Download size={18} />
+                Exporter
+                <ChevronDown size={14} />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-52 bg-white text-slate-900 rounded-lg shadow-xl border border-slate-200 z-20 overflow-hidden">
+                  <button
+                    onClick={() => {
+                      handleExportMarkdown();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                  >
+                    <FileText size={16} className="text-indigo-600" />
+                    Export Markdown
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportHtml();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                  >
+                    <FileCode size={16} className="text-blue-600" />
+                    Export HTML
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportDocx();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                  >
+                    <FileText size={16} className="text-green-600" />
+                    Export DOCX
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportPdf();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                  >
+                    <Printer size={16} className="text-rose-600" />
+                    Export PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleShareLink();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 border-t border-slate-200"
+                  >
+                    <Share2 size={16} className="text-purple-600" />
+                    Partager le lien
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               onClick={handleResetToDefault}
@@ -210,10 +395,21 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".md,.markdown,.txt"
+        accept=".md,.markdown,.txt,.pdf,.docx"
         onChange={handleUploadMarkdown}
         className="hidden"
       />
+
+      {(isDragActive || isImporting) && (
+        <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center z-30 pointer-events-none">
+          <div className="bg-white rounded-xl px-6 py-4 text-center shadow-xl border border-slate-200">
+            <p className="text-sm font-semibold text-slate-800">
+              {isImporting ? 'Import en cours...' : 'Déposez votre fichier pour l’importer'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">Markdown, PDF, DOCX et TXT acceptés</p>
+          </div>
+        </div>
+      )}
 
       {/* Footer - Info */}
       <div className="bg-gray-100 border-t border-gray-200 px-6 py-3 text-xs text-gray-600 flex items-center justify-between">

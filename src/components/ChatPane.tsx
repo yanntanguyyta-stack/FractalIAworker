@@ -22,6 +22,8 @@ const promptTemplates = [
   { icon: '📊', label: 'Crée un tableau', prompt: 'Crée un tableau Markdown récapitulatif basé sur le contenu de cette section.' },
   { icon: '🔀', label: 'Diagramme Mermaid', prompt: 'Génère un diagramme Mermaid pour visualiser les concepts de cette section.' },
   { icon: '✅', label: 'Liste de tâches', prompt: 'Transforme le contenu en une liste de tâches actionables.' },
+  { icon: '🤝', label: 'Suggestions proactives', prompt: 'Analyse cette section et propose des améliorations, sections manquantes et axes d’approfondissement.' },
+  { icon: '🌍', label: 'Traduction (EN)', prompt: 'Traduis cette section en anglais en conservant la structure Markdown.' },
 ];
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
@@ -31,6 +33,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   const [loading, setLoading] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState<number | null>(null);
   const [showTemplates, setShowTemplates] = React.useState(false);
+  const [translationLanguage, setTranslationLanguage] = React.useState('anglais');
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -44,40 +47,24 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   const activeNode = getActiveNode();
   const allNodes = getAllNodes();
 
-  if (!activeNode) {
-    return (
-      <div className={`bg-gray-50 flex items-center justify-center ${className}`}>
-        <div className="text-center">
-          <p className="text-gray-500">Sélectionnez un nœud pour discuter</p>
-        </div>
-      </div>
-    );
-  }
+  const sendPrompt = async (prompt: string) => {
+    if (!prompt.trim() || loading || !activeNode) return;
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
-
-    // Ajouter le message utilisateur
     const userMessage: ChatMessage = {
       role: 'user',
-      content: input,
+      content: prompt,
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMessage]);
-    setInput('');
     setLoading(true);
 
     try {
-      // Construire le contexte sandwich
       const context = buildContextSandwich(allNodes, activeNode);
       const systemPrompt = buildSystemPrompt(context, aiConfig.chatMode);
-      const messageForAI = buildUserMessage(context, input);
+      const messageForAI = buildUserMessage(context, prompt);
 
-      // Appeler l'IA avec la configuration
       const aiResponse = await callAIAPI(systemPrompt, messageForAI, aiConfig);
 
-      // Ajouter la réponse de l'IA
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: aiResponse,
@@ -98,6 +85,14 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    const prompt = input;
+    setInput('');
+    await sendPrompt(prompt);
   };
 
   const handleCommit = (messageContent: string, replaceContent: boolean = false) => {
@@ -122,6 +117,65 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
     setCopiedId(index);
     setTimeout(() => setCopiedId(null), 2000);
   };
+
+  const proactiveActions = React.useMemo(() => {
+    const actions: { id: string; label: string; prompt: string }[] = [];
+    if (!activeNode) {
+      return actions;
+    }
+    const trimmedContent = activeNode.content.trim();
+
+    if (!trimmedContent) {
+      actions.push({
+        id: 'plan',
+        label: 'Générer un plan structuré',
+        prompt: 'Propose un plan structuré et hiérarchisé pour cette section.',
+      });
+    }
+
+    if (trimmedContent && trimmedContent.length < 200) {
+      actions.push({
+        id: 'expand',
+        label: 'Développer la section',
+        prompt: 'Développe cette section avec plus de détails et d’arguments.',
+      });
+    }
+
+    actions.push(
+      {
+        id: 'todo',
+        label: 'Todo-list automatique',
+        prompt: 'Analyse le contenu et génère une todo-list claire avec des tâches actionnables.',
+      },
+      {
+        id: 'suggestions',
+        label: 'Suggestions proactives',
+        prompt: 'Identifie les améliorations possibles, sections manquantes et idées à approfondir.',
+      },
+      {
+        id: 'translate',
+        label: `Traduire en ${translationLanguage}`,
+        prompt: `Traduis cette section en ${translationLanguage} en conservant la structure Markdown.`,
+      },
+    );
+
+    return actions;
+  }, [activeNode?.content, translationLanguage]);
+
+  const handleRunAction = async (prompt: string) => {
+    setShowTemplates(false);
+    await sendPrompt(prompt);
+  };
+
+  if (!activeNode) {
+    return (
+      <div className={`bg-gray-50 flex items-center justify-center ${className}`}>
+        <div className="text-center">
+          <p className="text-gray-500">Sélectionnez un nœud pour discuter</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`bg-white flex flex-col h-full ${className}`}>
@@ -163,6 +217,34 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
               <FileText size={14} />
               Rédaction
             </button>
+          </div>
+        </div>
+
+        <div className="bg-white/80 border border-gray-200 rounded-lg p-2 mb-2">
+          <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
+            <span className="font-semibold text-gray-700">IA avancée</span>
+            <select
+              value={translationLanguage}
+              onChange={(event) => setTranslationLanguage(event.target.value)}
+              className="text-[11px] border border-gray-200 rounded px-1 py-0.5 bg-white"
+            >
+              <option value="anglais">Anglais</option>
+              <option value="français">Français</option>
+              <option value="espagnol">Espagnol</option>
+              <option value="allemand">Allemand</option>
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {proactiveActions.map((action) => (
+              <button
+                key={action.id}
+                onClick={() => handleRunAction(action.prompt)}
+                className="px-2 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-[11px] text-indigo-700 transition-colors"
+                disabled={loading}
+              >
+                {action.label}
+              </button>
+            ))}
           </div>
         </div>
 
