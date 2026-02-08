@@ -36,7 +36,7 @@ interface EditorPaneProps {
 type ViewMode = 'edit' | 'preview' | 'split';
 
 const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
-  const { getActiveNode, updateNodeContent, getNodePath, selectNode, activeNodeId } = useStore();
+  const { getActiveNode, updateNodeContent, getNodePath, selectNode, activeNodeId, assessmentConfig, updateNodeAssessment } = useStore();
   const activeNode = getActiveNode();
   const nodePath = activeNodeId ? getNodePath(activeNodeId) : [];
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
@@ -83,6 +83,15 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
       </div>
     );
   }
+
+  const evaluation = activeNode.meta.evaluation;
+  const completenessScore = evaluation?.completenessScore ?? 0;
+  const questionScore = evaluation?.questionScore ?? 0;
+
+  const handleScoreChange = (key: 'completenessScore' | 'questionScore') =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      updateNodeAssessment(activeNode.id, { [key]: Number(event.target.value) });
+    };
 
   // Insérer du texte à la position du curseur
   const insertText = (before: string, after: string = '', placeholder: string = '') => {
@@ -220,7 +229,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
       )}
 
       {/* Header avec métadonnées */}
-      <div className="border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 flex-shrink-0">
+      <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50 p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-bold text-gray-900 truncate flex-1">
             {activeNode.heading}
@@ -255,6 +264,61 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
           )}
         </div>
       </div>
+
+      {/* Évaluation */}
+      {assessmentConfig.enabled && (
+        <div className="border-b border-gray-200 bg-white/80 backdrop-blur p-3 flex-shrink-0">
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+            <span className="font-semibold text-gray-700">Évaluation de complétude</span>
+            <span>Scores /10</span>
+          </div>
+          <div className="text-xs text-gray-500 mb-3">
+            Question personnalisée : {assessmentConfig.question || 'Définissez une question globale dans les paramètres.'}
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-600 w-40">Complétude du nœud</span>
+              <input
+                type="range"
+                min={0}
+                max={10}
+                step={1}
+                value={completenessScore}
+                onChange={handleScoreChange('completenessScore')}
+                className="flex-1 accent-indigo-500"
+              />
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={completenessScore}
+                onChange={handleScoreChange('completenessScore')}
+                className="w-14 px-2 py-1 text-xs border border-gray-300 rounded-md"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-600 w-40">Score question globale</span>
+              <input
+                type="range"
+                min={0}
+                max={10}
+                step={1}
+                value={questionScore}
+                onChange={handleScoreChange('questionScore')}
+                className="flex-1 accent-indigo-500"
+              />
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={questionScore}
+                onChange={handleScoreChange('questionScore')}
+                className="w-14 px-2 py-1 text-xs border border-gray-300 rounded-md"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="border-b border-gray-200 bg-gray-50 px-2 py-1.5 flex items-center gap-0.5 flex-wrap flex-shrink-0">

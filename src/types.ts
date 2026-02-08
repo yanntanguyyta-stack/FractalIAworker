@@ -26,6 +26,14 @@ export const UIConfigSchema = z.object({
 
 export type UIConfig = z.infer<typeof UIConfigSchema>;
 
+// Schéma Zod pour l'évaluation de complétude
+export const NodeEvaluationSchema = z.object({
+  completenessScore: z.number().min(0).max(10).optional(),
+  questionScore: z.number().min(0).max(10).optional(),
+}).strict();
+
+export type NodeEvaluation = z.infer<typeof NodeEvaluationSchema>;
+
 // Types de nœuds supportés
 export type NodeType = 'project-root' | 'section' | 'task';
 
@@ -37,6 +45,7 @@ export const NodeMetaSchema = z.object({
   agentConfig: AgentConfigSchema.optional(),
   contextConfig: ContextConfigSchema.optional(),
   ui: UIConfigSchema.optional(),
+  evaluation: NodeEvaluationSchema.optional(),
 }).strict();
 
 export type NodeMeta = z.infer<typeof NodeMetaSchema>;

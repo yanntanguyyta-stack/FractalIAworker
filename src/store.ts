@@ -20,6 +20,11 @@ export interface AIConfig {
   chatMode: ChatMode;
 }
 
+export interface AssessmentConfig {
+  enabled: boolean;
+  question: string;
+}
+
 interface EditorState {
   // Données
   tree: NodeData[];
@@ -28,6 +33,7 @@ interface EditorState {
   
   // Configuration IA
   aiConfig: AIConfig;
+  assessmentConfig: AssessmentConfig;
 
   // Actions
   loadMarkdown: (markdown: string) => void;
@@ -44,6 +50,10 @@ interface EditorState {
   // Actions IA
   setAIConfig: (config: AIConfig) => void;
   setChatMode: (mode: ChatMode) => void;
+
+  // Actions Évaluation
+  setAssessmentConfig: (config: AssessmentConfig) => void;
+  updateNodeAssessment: (nodeId: string, updates: Partial<NodeData['meta']['evaluation']>) => void;
 }
 
 // Générer un ID simple
@@ -59,6 +69,32 @@ const defaultAIConfig: AIConfig = {
   chatMode: 'discussion',
 };
 
+const defaultAssessmentConfig: AssessmentConfig = {
+  enabled: false,
+  question: '',
+};
+
+const defaultEvaluation = {
+  completenessScore: 0,
+  questionScore: 0,
+};
+
+function ensureAssessmentMeta(nodes: NodeData[]): NodeData[] {
+  return nodes.map(node => {
+    const evaluation = node.meta.evaluation ?? { ...defaultEvaluation };
+    const updatedMeta = node.meta.evaluation ? node.meta : { ...node.meta, evaluation };
+    const updatedChildren = node.children.length > 0 ? ensureAssessmentMeta(node.children) : node.children;
+    if (updatedMeta === node.meta && updatedChildren === node.children) {
+      return node;
+    }
+    return {
+      ...node,
+      meta: updatedMeta,
+      children: updatedChildren,
+    };
+  });
+}
+
 export const useStore = create<EditorState>()(
   persist(
     (set, get) => ({
@@ -66,10 +102,13 @@ export const useStore = create<EditorState>()(
       activeNodeId: null,
       markdown: '',
       aiConfig: defaultAIConfig,
+      assessmentConfig: defaultAssessmentConfig,
 
   // Charger le Markdown et parser l'arbre
   loadMarkdown: (markdown: string) => {
-    const tree = parseMarkdownToTree(markdown);
+    const parsedTree = parseMarkdownToTree(markdown);
+    const { assessmentConfig } = get();
+    const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsedTree) : parsedTree;
     const activeNodeId = tree.length > 0 ? tree[0].id : null;
     set({ tree, markdown, activeNodeId });
   },
@@ -110,6 +149,7 @@ export const useStore = create<EditorState>()(
     const { tree } = get();
     const parent = findNodeById(tree, parentId);
     if (parent) {
+      const { assessmentConfig } = get();
       const newNode: NodeData = {
         id: generateId(),
         heading,
@@ -118,6 +158,7 @@ export const useStore = create<EditorState>()(
         meta: {
           id: generateId(),
           type: 'section',
+          evaluation: assessmentConfig.enabled ? { ...defaultEvaluation } : undefined,
         },
         children: [],
       };
@@ -194,10 +235,32 @@ export const useStore = create<EditorState>()(
     const { aiConfig } = get();
     set({ aiConfig: { ...aiConfig, chatMode: mode } });
   },
+
+  setAssessmentConfig: (config: AssessmentConfig) => {
+    const { assessmentConfig, tree } = get();
+    if (!assessmentConfig.enabled && config.enabled) {
+      const updatedTree = ensureAssessmentMeta(tree);
+      set({ assessmentConfig: config, tree: updatedTree });
+      return;
+    }
+    set({ assessmentConfig: config });
+  },
+
+  updateNodeAssessment: (nodeId: string, updates: Partial<NodeData['meta']['evaluation']>) => {
+    const { tree } = get();
+    const node = findNodeById(tree, nodeId);
+    if (node) {
+      const baseEvaluation = node.meta.evaluation ?? defaultEvaluation;
+      const evaluation = { ...baseEvaluation, ...updates };
+      const updatedMeta = { ...node.meta, evaluation };
+      const updated = updateNodeInTree(tree, nodeId, { meta: updatedMeta });
+      set({ tree: updated });
+    }
+  },
     }),
     {
       name: 'irlm-ai-config',
-      partialize: (state) => ({ aiConfig: state.aiConfig }),
+      partialize: (state) => ({ aiConfig: state.aiConfig, assessmentConfig: state.assessmentConfig }),
     }
   )
 );

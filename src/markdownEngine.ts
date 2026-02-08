@@ -20,8 +20,9 @@ function parseMetaFromComment(comment: string): NodeMeta | null {
     const match = comment.match(HTML_COMMENT_REGEX);
     if (!match) return null;
     const json = JSON.parse(match[1]);
+    const meta = json?.meta ?? json;
     // Valider avec Zod
-    return NodeMetaSchema.parse(json);
+    return NodeMetaSchema.parse(meta);
   } catch (error) {
     console.warn('Failed to parse metadata from comment:', error);
     return null;

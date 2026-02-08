@@ -11,6 +11,7 @@ Une application révolutionnaire de collaboration IA où un fichier Markdown uni
 - 🏗️ **Architecture Local-First**: Tout fonctionnement sans serveur
 - 📚 **Contexte Sandwich**: L'IA reçoit un contexte structuré en 3 couches (Global, Rôle, Tâche)
 - 💾 **Métadonnées Invisibles**: Les configurations IA sont stockées en commentaires HTML
+- 📊 **Scores de Complétude**: Évaluez chaque nœud /10 avec une question globale
 - 🎨 **Interface 3 Colonnes**: Navigation, Édition, Chat IA côte à côte
 - ⚡ **State Management**: Zustand pour la gestion d'état réactive
 - 🎯 **TypeScript Strict**: Typage complet pour la robustesse
@@ -60,14 +61,14 @@ Configuration:
 npm install
 ```
 
-### 2. Configurer la clé Gemini (secret local)
-Créez un fichier `.env.local` à la racine du projet :
+### 2. Configurer votre clé API (Bring Your Own Key)
+L'application utilise le modèle **BYOK** : chaque utilisateur renseigne sa clé dans l'interface.
 
-```bash
-VITE_GEMINI_API_KEY=VOTRE_CLE_GEMINI
-```
+1. Ouvrez la configuration IA via le bouton ⚙️ **Configurer IA**
+2. Choisissez votre fournisseur (Gemini ou OpenAI)
+3. Collez votre clé API
 
-> Le fichier `.env.local` est ignoré par Git. Ne le commitez pas.
+> La clé est stockée **localement dans votre navigateur** (localStorage) et n'est jamais envoyée à un serveur.
 
 ### 3. Lancer le serveur de développement
 ```bash
@@ -81,6 +82,33 @@ L'application s'ouvrira automatiquement à `http://localhost:5173`
 npm run build
 npm run preview
 ```
+
+## 👥 Multi‑utilisateurs (Vercel)
+
+Une fois déployée, **chaque utilisateur a son propre état local** (localStorage) dans son navigateur.
+
+- Pas de partage automatique entre utilisateurs
+- Aucune authentification requise
+- Chacun gère sa clé API et ses documents localement
+
+## ☁️ Déploiement sur Vercel
+
+Le projet est un **SPA Vite** sans backend, prêt pour Vercel.
+
+- **Build Command** : `npm run build`
+- **Output Directory** : `dist`
+- **Framework Preset** : Vite
+
+Un fichier `vercel.json` est fourni pour la réécriture SPA (`/index.html`).
+
+## 📊 Évaluation de complétude (feature activable)
+
+Activez l’évaluation dans ⚙️ **Configuration IA** pour stocker, dans chaque nœud, deux scores /10 :
+
+- **Complétude du nœud** (par rapport au thème)
+- **Score lié à votre question globale** (ex : "Le projet est‑il viable ?")
+
+Ces scores sont persistés dans les **métadonnées invisibles** du Markdown.
 
 ## 💡 Concepts Clés
 
