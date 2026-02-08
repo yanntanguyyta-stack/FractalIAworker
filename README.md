@@ -60,14 +60,14 @@ Configuration:
 npm install
 ```
 
-### 2. Configurer la clé Gemini (secret local)
-Créez un fichier `.env.local` à la racine du projet :
+### 2. Configurer votre clé API (Bring Your Own Key)
+L'application utilise le modèle **BYOK** : chaque utilisateur renseigne sa clé dans l'interface.
 
-```bash
-VITE_GEMINI_API_KEY=VOTRE_CLE_GEMINI
-```
+1. Ouvrez la configuration IA via le bouton ⚙️ **Configurer IA**
+2. Choisissez votre fournisseur (Gemini ou OpenAI)
+3. Collez votre clé API
 
-> Le fichier `.env.local` est ignoré par Git. Ne le commitez pas.
+> La clé est stockée **localement dans votre navigateur** (localStorage) et n'est jamais envoyée à un serveur.
 
 ### 3. Lancer le serveur de développement
 ```bash
@@ -81,6 +81,16 @@ L'application s'ouvrira automatiquement à `http://localhost:5173`
 npm run build
 npm run preview
 ```
+
+## ☁️ Déploiement sur Vercel
+
+Le projet est un **SPA Vite** sans backend, prêt pour Vercel.
+
+- **Build Command** : `npm run build`
+- **Output Directory** : `dist`
+- **Framework Preset** : Vite
+
+Un fichier `vercel.json` est fourni pour la réécriture SPA (`/index.html`).
 
 ## 💡 Concepts Clés
 
