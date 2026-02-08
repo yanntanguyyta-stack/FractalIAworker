@@ -8,10 +8,12 @@ interface SettingsModalProps {
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { aiConfig, setAIConfig } = useStore();
+  const { aiConfig, assessmentConfig, setAIConfig, setAssessmentConfig } = useStore();
   const [provider, setProvider] = React.useState(aiConfig.provider);
   const [apiKey, setApiKey] = React.useState(aiConfig.apiKey);
   const [model, setModel] = React.useState(aiConfig.model);
+  const [assessmentEnabled, setAssessmentEnabled] = React.useState(assessmentConfig.enabled);
+  const [assessmentQuestion, setAssessmentQuestion] = React.useState(assessmentConfig.question);
   const [saved, setSaved] = React.useState(false);
 
   // Modèles disponibles par provider
@@ -37,12 +39,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     }
   }, [provider]);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setProvider(aiConfig.provider);
+      setApiKey(aiConfig.apiKey);
+      setModel(aiConfig.model);
+      setAssessmentEnabled(assessmentConfig.enabled);
+      setAssessmentQuestion(assessmentConfig.question);
+    }
+  }, [isOpen, aiConfig, assessmentConfig]);
+
   const handleSave = () => {
     setAIConfig({
       provider,
       apiKey,
       model,
       chatMode: aiConfig.chatMode,
+    });
+    setAssessmentConfig({
+      enabled: assessmentEnabled,
+      question: assessmentQuestion.trim(),
     });
     setSaved(true);
     setTimeout(() => {
@@ -169,6 +185,43 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               </li>
             </ul>
           </div>
+
+          {/* Assessment Settings */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Évaluation de complétude</p>
+                <p className="text-xs text-gray-500">Ajoute des scores /10 dans les métadonnées de chaque nœud.</p>
+              </div>
+              <button
+                onClick={() => setAssessmentEnabled(!assessmentEnabled)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${
+                  assessmentEnabled ? 'bg-indigo-600' : 'bg-gray-300'
+                }`}
+                type="button"
+                aria-pressed={assessmentEnabled}
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                    assessmentEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Question globale à évaluer (score personnalisé)
+              </label>
+              <input
+                type="text"
+                value={assessmentQuestion}
+                onChange={(e) => setAssessmentQuestion(e.target.value)}
+                placeholder="Ex: Est-ce que le projet est viable ?"
+                disabled={!assessmentEnabled}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
@@ -181,13 +234,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           </button>
           <button
             onClick={handleSave}
-            disabled={!apiKey.trim()}
             className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 transition-all ${
               saved
                 ? 'bg-green-500 text-white'
                 : apiKey.trim()
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-orange-500 text-white hover:bg-orange-600'
             }`}
           >
             {saved ? (

@@ -102,13 +102,13 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
   };
 
   return (
-    <div className={`w-full h-screen bg-gray-50 flex flex-col ${className}`}>
+    <div className={`w-full h-screen bg-slate-100 flex flex-col ${className}`}>
       {/* Top Bar */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 shadow-md">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 text-white px-6 py-4 shadow-lg">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">🧠 IRLM Node Interface</h1>
-            <p className="text-blue-100 text-sm">
+            <p className="text-slate-200 text-sm">
               Local-First Markdown Collaboration avec IA Persona
             </p>
           </div>
@@ -116,7 +116,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
           <div className="flex gap-3">
             <button
               onClick={() => setNewDocWizardOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-xl font-medium transition-colors shadow-sm"
               title="Créer un nouveau document avec l'IA"
             >
               <FilePlus size={18} />
@@ -125,7 +125,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
               title="Charger un fichier Markdown"
             >
               <Upload size={18} />
@@ -134,7 +134,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
             <button
               onClick={handleDownloadMarkdown}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
               title="Télécharger le Markdown"
             >
               <Download size={18} />
@@ -143,7 +143,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
             <button
               onClick={handleResetToDefault}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-700 rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl font-medium transition-colors shadow-sm"
               title="Réinitialiser aux données par défaut"
             >
               <RefreshCw size={18} />
@@ -152,7 +152,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
             <button
               onClick={() => setSettingsOpen(true)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors shadow-sm ${
                 aiConfig.apiKey 
                   ? 'bg-green-500 hover:bg-green-600' 
                   : 'bg-orange-500 hover:bg-orange-600 animate-pulse'

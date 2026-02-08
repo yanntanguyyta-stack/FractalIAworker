@@ -126,15 +126,15 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   return (
     <div className={`bg-white flex flex-col h-full ${className}`}>
       {/* Header */}
-      <div className="border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50 p-3 flex-shrink-0">
+      <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50 p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-bold text-gray-900">Assistant IA</h3>
           <button
             onClick={onOpenSettings}
-            className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-indigo-100 rounded-lg transition-colors"
             title="Configurer l'IA"
           >
-            <Settings size={18} className="text-purple-600" />
+            <Settings size={18} className="text-indigo-600" />
           </button>
         </div>
 

@@ -205,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     <div
       className={`bg-white flex flex-col h-full ${className}`}
     >
-      <div className="p-3 border-b border-gray-200 flex-shrink-0">
+      <div className="p-3 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
             <FolderTree size={18} className="text-blue-600" />

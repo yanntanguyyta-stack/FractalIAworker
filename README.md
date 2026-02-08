@@ -11,6 +11,7 @@ Une application révolutionnaire de collaboration IA où un fichier Markdown uni
 - 🏗️ **Architecture Local-First**: Tout fonctionnement sans serveur
 - 📚 **Contexte Sandwich**: L'IA reçoit un contexte structuré en 3 couches (Global, Rôle, Tâche)
 - 💾 **Métadonnées Invisibles**: Les configurations IA sont stockées en commentaires HTML
+- 📊 **Scores de Complétude**: Évaluez chaque nœud /10 avec une question globale
 - 🎨 **Interface 3 Colonnes**: Navigation, Édition, Chat IA côte à côte
 - ⚡ **State Management**: Zustand pour la gestion d'état réactive
 - 🎯 **TypeScript Strict**: Typage complet pour la robustesse
@@ -82,6 +83,14 @@ npm run build
 npm run preview
 ```
 
+## 👥 Multi‑utilisateurs (Vercel)
+
+Une fois déployée, **chaque utilisateur a son propre état local** (localStorage) dans son navigateur.
+
+- Pas de partage automatique entre utilisateurs
+- Aucune authentification requise
+- Chacun gère sa clé API et ses documents localement
+
 ## ☁️ Déploiement sur Vercel
 
 Le projet est un **SPA Vite** sans backend, prêt pour Vercel.
@@ -91,6 +100,15 @@ Le projet est un **SPA Vite** sans backend, prêt pour Vercel.
 - **Framework Preset** : Vite
 
 Un fichier `vercel.json` est fourni pour la réécriture SPA (`/index.html`).
+
+## 📊 Évaluation de complétude (feature activable)
+
+Activez l’évaluation dans ⚙️ **Configuration IA** pour stocker, dans chaque nœud, deux scores /10 :
+
+- **Complétude du nœud** (par rapport au thème)
+- **Score lié à votre question globale** (ex : "Le projet est‑il viable ?")
+
+Ces scores sont persistés dans les **métadonnées invisibles** du Markdown.
 
 ## 💡 Concepts Clés
 
