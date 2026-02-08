@@ -158,14 +158,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const handleMoveNode = (sourceId: string, targetId: string | null) => {
     const success = moveNode(sourceId, targetId);
     if (!success) {
-      alert('Impossible de déplacer ce nœud à cet endroit.');
+      alert('Impossible de déplacer ce nœud (profondeur maximale atteinte ou cible invalide).');
     }
   };
 
   const handlePasteNode = (targetId: string | null) => {
     const success = pasteNode(targetId);
     if (!success) {
-      alert('Impossible de coller ce nœud ici (profondeur maximale atteinte).');
+      alert('Impossible de coller ce nœud ici (profondeur maximale atteinte ou cible invalide).');
     }
   };
 

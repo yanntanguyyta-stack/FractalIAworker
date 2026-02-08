@@ -170,7 +170,8 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       loadMarkdown(markdown);
     } catch (error) {
       console.error('Erreur lors de la lecture du fichier:', error);
-      alert('Erreur: Impossible d’importer ce fichier.');
+      const message = error instanceof Error ? error.message : 'Impossible d’importer ce fichier.';
+      alert(`Erreur d’import : ${message}`);
     } finally {
       setIsImporting(false);
     }

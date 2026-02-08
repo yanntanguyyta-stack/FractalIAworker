@@ -79,9 +79,18 @@ function escapeHtml(value: string): string {
 }
 
 export function markdownToHtml(content: string): string {
-  let html = escapeHtml(content);
+  const mermaidBlocks: string[] = [];
+  const placeholderContent = content.replace(/```mermaid\n([\s\S]*?)```/g, (_match, code) => {
+    mermaidBlocks.push(escapeHtml(code));
+    return `__MERMAID_BLOCK_${mermaidBlocks.length - 1}__`;
+  });
 
-  html = html.replace(/```mermaid\n([\s\S]*?)```/g, '<div class="mermaid">$1</div>');
+  let html = escapeHtml(placeholderContent);
+
+  html = html.replace(/__MERMAID_BLOCK_(\d+)__/g, (_match, index) => {
+    const code = mermaidBlocks[Number(index)] ?? '';
+    return `<div class="mermaid">${code}</div>`;
+  });
 
   html = html
     .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
@@ -109,13 +118,14 @@ export function markdownToHtml(content: string): string {
 }
 
 export function buildHtmlDocument(markdown: string, title: string): string {
+  const safeTitle = escapeHtml(title);
   const body = markdownToHtml(markdown);
   return `<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${title}</title>
+  <title>${safeTitle}</title>
   <style>
     body { font-family: 'Inter', 'Segoe UI', sans-serif; margin: 32px; color: #0f172a; }
     h1, h2, h3 { color: #1e293b; }

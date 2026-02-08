@@ -272,7 +272,9 @@ export const useStore = create<EditorState>()(
     const { tree } = get();
     const node = findNodeById(tree, nodeId);
     if (node) {
-      const snapshot = JSON.parse(JSON.stringify(node)) as NodeData;
+      const snapshot = typeof structuredClone === 'function'
+        ? (structuredClone(node) as NodeData)
+        : (JSON.parse(JSON.stringify(node)) as NodeData);
       set({ clipboardNode: snapshot });
     }
   },
