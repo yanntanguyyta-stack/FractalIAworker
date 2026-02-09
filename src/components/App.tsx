@@ -7,7 +7,10 @@ import EditorPane from './EditorPane';
 import ChatPane from './ChatPane';
 import SettingsModal from './SettingsModal';
 import NewDocumentWizard from './NewDocumentWizard';
-import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical } from 'lucide-react';
+import OnboardingWizard from './OnboardingWizard';
+import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, HelpCircle } from 'lucide-react';
+
+const ONBOARDING_COMPLETED_KEY = 'fractalia_onboarding_completed';
 
 interface AppProps {
   className?: string;
@@ -18,6 +21,15 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newDocWizardOpen, setNewDocWizardOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    // Afficher l'onboarding si c'est la première visite
+    return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
+  });
+
+  const handleCloseOnboarding = useCallback(() => {
+    setOnboardingOpen(false);
+    localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
+  }, []);
   
   // Migration des anciens noms de modèles (correction automatique)
   useEffect(() => {
@@ -171,6 +183,15 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
               <Settings size={18} />
               {aiConfig.apiKey ? 'IA Configurée' : 'Configurer IA'}
             </button>
+
+            <button
+              onClick={() => setOnboardingOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
+              title="Aide et tutoriel"
+            >
+              <HelpCircle size={18} />
+              Aide
+            </button>
           </div>
         </div>
       </div>
@@ -239,6 +260,13 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
       {/* Wizard Nouveau Document */}
       <NewDocumentWizard isOpen={newDocWizardOpen} onClose={() => setNewDocWizardOpen(false)} />
+
+      {/* Onboarding pour les nouveaux utilisateurs */}
+      <OnboardingWizard 
+        isOpen={onboardingOpen} 
+        onClose={handleCloseOnboarding}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
     </div>
   );
 };
