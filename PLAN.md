@@ -111,6 +111,37 @@ Rendre l'interface testable et fonctionnelle avec un appel réel aux APIs IA.
 - [ ] Suggestions proactives de l'IA
 - [ ] Traduction de sections
 
+### 5.5 Tests et qualité
+**Objectif** : Assurer une couverture de tests suffisante pour garantir la stabilité et la maintenabilité du projet.
+
+- [ ] Mise en place de l'infrastructure de tests (Vitest + React Testing Library)
+- [ ] Tests unitaires des fonctions utilitaires (store, aiService, markdownEngine)
+- [ ] Tests de composants React (Sidebar, EditorPane, ChatPane, etc.)
+- [ ] Tests d'intégration des flux utilisateur principaux
+- [ ] Configuration du rapport de couverture de code
+- [ ] Objectif : couverture minimale de 70%
+
+### 5.6 Parcours d'onboarding
+**Objectif** : Guider les nouveaux utilisateurs à travers les fonctionnalités de l'application.
+
+- [ ] Bouton "Présentation" accessible depuis l'interface principale
+- [ ] Tour guidé interactif des fonctionnalités principales
+- [ ] Mise en évidence des éléments UI avec explications contextuelles
+- [ ] Étapes du parcours : Sidebar → Éditeur → Chat IA → Modes de vue → Toolbar
+- [ ] Option de ne plus afficher au démarrage (localStorage)
+- [ ] Possibilité de relancer le tour à tout moment
+
+### 5.7 Gestion multi-documents
+**Objectif** : Permettre la gestion de plusieurs documents avec import/export en masse.
+
+- [ ] Interface de gestion de bibliothèque de documents
+- [ ] Liste des documents avec métadonnées (titre, date, taille)
+- [ ] Création, suppression et sélection de documents
+- [ ] Export de tous les documents en un seul fichier (ZIP ou JSON)
+- [ ] Import en masse depuis un fichier d'archive
+- [ ] Persistance des documents dans localStorage ou IndexedDB
+- [ ] Gestion des conflits lors de l'import
+
 ---
 
 ## Priorités immédiates

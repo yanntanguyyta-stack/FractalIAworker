@@ -142,18 +142,29 @@ export function buildSystemPrompt(context: AIContextSandwich, chatMode: ChatMode
   let prompt = '';
 
   // Instructions de mode en premier
-  if (chatMode === 'redaction') {
-    prompt += `## INSTRUCTIONS DE RÉDACTION (MODE RÉDACTION ACTIF)
-Tu es en MODE RÉDACTION. Tes réponses seront intégrées directement dans un document.
+  if (chatMode === 'structuration') {
+    prompt += `## INSTRUCTIONS DE STRUCTURATION (MODE CHEF DE PROJET ACTIF)
+Tu es en MODE STRUCTURATION. Tu agis comme un **chef de projet** qui organise et structure le travail.
+
+TON RÔLE :
+- Analyser le contenu et identifier les sous-thèmes ou sous-tâches
+- Proposer une décomposition logique en sous-sections
+- Évaluer la complétude de la structure actuelle
+- Suggérer les parties manquantes
 
 RÈGLES STRICTES :
-- Réponds UNIQUEMENT avec le contenu à intégrer, rien d'autre
-- PAS d'introduction ("Voici...", "Bien sûr...", "Je vais...")
-- PAS de conclusion ("N'hésite pas...", "Si tu as besoin...")
-- PAS de phrases de politesse ou de transition
-- Format Markdown propre et structuré
-- Utilise les listes, tableaux et titres de manière appropriée
-- Sois concis et précis
+- Propose TOUJOURS des sous-sections avec des titres Markdown du bon niveau
+- Utilise le format de titre approprié (### pour niveau 3, #### pour niveau 4, etc.)
+- Structure ta réponse de façon claire et actionable
+- Identifie ce qui manque pour être complet
+
+FORMAT DE RÉPONSE :
+Quand tu proposes des sous-sections, utilise ce format :
+### Sous-section 1
+Brève description de ce que cette section doit contenir.
+
+### Sous-section 2
+Brève description...
 
 `;
   } else {
@@ -198,6 +209,39 @@ Le nœud actif est le dernier de cette hiérarchie. Garde ce contexte parent en 
     });
     prompt += '\n';
   }
+
+  // Instructions pour la création de sous-nœuds
+  const currentNode = context.nodePath[context.nodePath.length - 1];
+  const currentDepth = currentNode?.headingDepth || 1;
+  const childDepth = currentDepth + 1;
+  const childHeadingPrefix = '#'.repeat(childDepth);
+
+  prompt += `## STRUCTURE HIÉRARCHIQUE ET CRÉATION DE SOUS-SECTIONS
+Tu travailles sur un nœud de niveau ${currentDepth} (profondeur de titre: ${'#'.repeat(currentDepth)}).
+
+**IMPORTANT - Propose des sous-sections quand c'est pertinent !**
+
+Si le sujet abordé est complexe ou mérite d'être décomposé, tu DOIS suggérer la création de sous-nœuds enfants.
+
+Pour proposer des sous-sections, utilise des titres Markdown de niveau ${childDepth} :
+\`\`\`
+${childHeadingPrefix} Nom de la sous-section 1
+Contenu...
+
+${childHeadingPrefix} Nom de la sous-section 2
+Contenu...
+\`\`\`
+
+**Quand proposer des sous-nœuds :**
+- Le sujet peut être décomposé en parties distinctes
+- Plusieurs aspects différents doivent être traités
+- Une structure arborescente améliorerait la clarté
+- L'utilisateur demande un développement détaillé
+
+**Format de suggestion :**
+Tu peux dire : "Je te propose de structurer ce nœud avec les sous-sections suivantes :" puis lister les titres de niveau ${childDepth}.
+
+`;
 
   return prompt;
 }

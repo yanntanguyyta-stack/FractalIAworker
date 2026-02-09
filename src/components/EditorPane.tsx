@@ -20,6 +20,7 @@ import {
   Check,
   ChevronRight,
   Home,
+  RefreshCw,
 } from 'lucide-react';
 
 // Initialiser Mermaid
@@ -36,7 +37,7 @@ interface EditorPaneProps {
 type ViewMode = 'edit' | 'preview' | 'split';
 
 const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
-  const { getActiveNode, updateNodeContent, getNodePath, selectNode, activeNodeId, assessmentConfig, updateNodeAssessment } = useStore();
+  const { getActiveNode, updateNodeContent, getNodePath, selectNode, activeNodeId, assessmentConfig, updateNodeAssessment, recalculateAllInheritedScores } = useStore();
   const activeNode = getActiveNode();
   const nodePath = activeNodeId ? getNodePath(activeNodeId) : [];
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
@@ -87,6 +88,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   const evaluation = activeNode.meta.evaluation;
   const completenessScore = evaluation?.completenessScore ?? 0;
   const questionScore = evaluation?.questionScore ?? 0;
+  const inheritedCompleteness = evaluation?.inheritedCompletenessScore;
+  const inheritedQuestion = evaluation?.inheritedQuestionScore;
+  const hasChildren = activeNode.children.length > 0;
 
   const handleScoreChange = (key: 'completenessScore' | 'questionScore') =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -311,11 +315,39 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
         <div className="border-b border-gray-200 bg-white/80 backdrop-blur p-3 flex-shrink-0">
           <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
             <span className="font-semibold text-gray-700">Évaluation de complétude</span>
-            <span>Scores /10</span>
+            <button
+              onClick={() => recalculateAllInheritedScores()}
+              className="flex items-center gap-1 px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded transition-colors"
+              title="Recalculer les notes héritées"
+            >
+              <RefreshCw size={12} />
+              <span>Recalculer</span>
+            </button>
           </div>
           <div className="text-xs text-gray-500 mb-3">
             Question personnalisée : {assessmentConfig.question || 'Définissez une question globale dans les paramètres.'}
           </div>
+          
+          {/* Notes héritées des enfants */}
+          {hasChildren && (inheritedCompleteness !== undefined || inheritedQuestion !== undefined) && (
+            <div className="mb-3 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <div className="text-xs font-semibold text-blue-700 mb-2">📊 Notes héritées (moyenne des {activeNode.children.length} enfants)</div>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-blue-600">Complétude:</span>
+                  <span className="font-bold text-blue-800">{inheritedCompleteness?.toFixed(1) ?? '-'}/10</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-blue-600">Question:</span>
+                  <span className="font-bold text-blue-800">{inheritedQuestion?.toFixed(1) ?? '-'}/10</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {hasChildren && (
+            <div className="text-xs font-semibold text-gray-600 mb-1">📝 Notes propres (ce nœud)</div>
+          )}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-600 w-40">Complétude du nœud</span>

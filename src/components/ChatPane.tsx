@@ -16,12 +16,12 @@ interface ChatPaneProps {
 
 // Templates de prompts rapides - organisés par catégorie
 const promptTemplates = [
-  // Rédaction
-  { icon: '📝', label: 'Développe ce point', prompt: 'Développe et détaille le contenu de cette section de manière approfondie.', category: 'redaction' },
-  { icon: '📋', label: 'Résume', prompt: 'Fais un résumé concis du contenu actuel de cette section.', category: 'redaction' },
-  { icon: '💡', label: 'Ajoute des exemples', prompt: 'Ajoute des exemples concrets et pertinents pour illustrer les points de cette section.', category: 'redaction' },
-  { icon: '✅', label: 'Liste de tâches', prompt: 'Transforme le contenu en une liste de tâches actionables avec des cases à cocher Markdown (- [ ]).', category: 'redaction' },
-  { icon: '🔍', label: 'Améliore le style', prompt: 'Améliore le style et la clarté du texte actuel tout en conservant le sens.', category: 'redaction' },
+  // Structuration
+  { icon: '🏗️', label: 'Propose des sous-sections', prompt: 'Analyse ce nœud et propose une décomposition en sous-sections logiques. Liste les sous-thèmes avec des titres Markdown du niveau approprié.', category: 'structuration' },
+  { icon: '📋', label: 'Décompose en tâches', prompt: 'Décompose ce sujet en tâches ou étapes distinctes. Propose une liste de sous-nœuds avec leur objectif.', category: 'structuration' },
+  { icon: '🎯', label: 'Identifie les axes', prompt: 'Identifie les différents axes ou dimensions de ce sujet qui mériteraient chacun une section dédiée.', category: 'structuration' },
+  { icon: '🔀', label: 'Réorganise la structure', prompt: 'Analyse la structure actuelle et propose une meilleure organisation des sous-sections.', category: 'structuration' },
+  { icon: '✅', label: 'Évalue la complétude', prompt: 'Évalue si ce nœud et ses enfants couvrent bien le sujet. Quelles sous-sections manquent ?', category: 'structuration' },
   
   // Tableaux
   { icon: '📊', label: 'Tableau récapitulatif', prompt: 'Crée un tableau Markdown récapitulatif basé sur le contenu de cette section.', category: 'tableau' },
@@ -174,15 +174,15 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
               Discussion
             </button>
             <button
-              onClick={() => setChatMode('redaction')}
+              onClick={() => setChatMode('structuration')}
               className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                aiConfig.chatMode === 'redaction' 
+                aiConfig.chatMode === 'structuration' 
                   ? 'bg-white shadow text-orange-700' 
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               <FileText size={14} />
-              Rédaction
+              Structuration
             </button>
           </div>
         </div>
@@ -218,11 +218,11 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
             </select>
             <ChevronDown size={10} className="absolute right-2 pointer-events-none" />
           </div>
-          {aiConfig.chatMode === 'redaction' && (
+          {aiConfig.chatMode === 'structuration' && (
             <>
               <span className="text-gray-400">•</span>
               <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                ✍️ Mode Rédaction
+                🏗️ Mode Structuration
               </span>
             </>
           )}
@@ -235,8 +235,8 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
           <div className="text-center text-gray-500 py-8">
             <p className="mb-2">Aucun message pour l'instant.</p>
             <p className="text-xs mb-4">
-              {aiConfig.chatMode === 'redaction' 
-                ? 'Mode Rédaction : les réponses seront prêtes à intégrer au document.'
+              {aiConfig.chatMode === 'structuration' 
+                ? 'Mode Structuration : l\'IA agit comme chef de projet et propose des sous-sections.'
                 : 'Mode Discussion : posez vos questions librement.'}
             </p>
             <p className="text-xs text-gray-400">
@@ -320,11 +320,11 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
       {/* Templates rapides - organisés par catégorie */}
       {showTemplates && (
         <div className="border-t border-gray-200 bg-white p-3 flex-shrink-0 max-h-64 overflow-y-auto">
-          {/* Rédaction */}
+          {/* Structuration */}
           <div className="mb-3">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">✍️ Rédaction</h4>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">🏗️ Structuration</h4>
             <div className="grid grid-cols-2 gap-1.5">
-              {promptTemplates.filter(t => t.category === 'redaction').map((template) => (
+              {promptTemplates.filter(t => t.category === 'structuration').map((template) => (
                 <button
                   key={template.label}
                   onClick={() => handleUseTemplate(template.prompt)}
@@ -396,8 +396,8 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={aiConfig.chatMode === 'redaction' 
-              ? "Décrivez le contenu à générer..." 
+            placeholder={aiConfig.chatMode === 'structuration' 
+              ? "Demandez une analyse ou structuration..." 
               : "Posez une question..."
             }
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
