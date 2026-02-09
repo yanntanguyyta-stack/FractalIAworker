@@ -1,4 +1,4 @@
 declare module 'mammoth/mammoth.browser' {
-  import mammoth = require('mammoth');
-  export = mammoth;
+  export function convertToHtml(input: { arrayBuffer: ArrayBuffer }): Promise<{ value: string }>;
+  export function extractRawText(input: { arrayBuffer: ArrayBuffer }): Promise<{ value: string }>;
 }

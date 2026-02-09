@@ -14,26 +14,37 @@ interface ChatPaneProps {
   onOpenSettings?: () => void;
 }
 
-// Templates de prompts rapides
+// Templates de prompts rapides - organisés par catégorie
 const promptTemplates = [
-  { icon: '📝', label: 'Développe ce point', prompt: 'Développe et détaille le contenu de cette section de manière approfondie.' },
-  { icon: '📋', label: 'Résume', prompt: 'Fais un résumé concis du contenu actuel de cette section.' },
-  { icon: '💡', label: 'Ajoute des exemples', prompt: 'Ajoute des exemples concrets et pertinents pour illustrer les points de cette section.' },
-  { icon: '📊', label: 'Crée un tableau', prompt: 'Crée un tableau Markdown récapitulatif basé sur le contenu de cette section.' },
-  { icon: '🔀', label: 'Diagramme Mermaid', prompt: 'Génère un diagramme Mermaid pour visualiser les concepts de cette section.' },
-  { icon: '✅', label: 'Liste de tâches', prompt: 'Transforme le contenu en une liste de tâches actionables.' },
-  { icon: '🤝', label: 'Suggestions proactives', prompt: 'Analyse cette section et propose des améliorations, sections manquantes et axes d’approfondissement.' },
-  { icon: '🌍', label: 'Traduction (EN)', prompt: 'Traduis cette section en anglais en conservant la structure Markdown.' },
+  // Structuration
+  { icon: '🏗️', label: 'Propose des sous-sections', prompt: 'Analyse ce nœud et propose une décomposition en sous-sections logiques. Liste les sous-thèmes avec des titres Markdown du niveau approprié.', category: 'structuration' },
+  { icon: '📋', label: 'Décompose en tâches', prompt: 'Décompose ce sujet en tâches ou étapes distinctes. Propose une liste de sous-nœuds avec leur objectif.', category: 'structuration' },
+  { icon: '🎯', label: 'Identifie les axes', prompt: 'Identifie les différents axes ou dimensions de ce sujet qui mériteraient chacun une section dédiée.', category: 'structuration' },
+  { icon: '🔀', label: 'Réorganise la structure', prompt: 'Analyse la structure actuelle et propose une meilleure organisation des sous-sections.', category: 'structuration' },
+  { icon: '✅', label: 'Évalue la complétude', prompt: 'Évalue si ce nœud et ses enfants couvrent bien le sujet. Quelles sous-sections manquent ?', category: 'structuration' },
+  
+  // Tableaux
+  { icon: '📊', label: 'Tableau récapitulatif', prompt: 'Crée un tableau Markdown récapitulatif basé sur le contenu de cette section.', category: 'tableau' },
+  { icon: '📈', label: 'Tableau comparatif', prompt: 'Crée un tableau Markdown comparatif (avantages/inconvénients ou comparaison de solutions).', category: 'tableau' },
+  { icon: '📅', label: 'Planning/Timeline', prompt: 'Crée un tableau Markdown avec un planning ou une timeline des étapes.', category: 'tableau' },
+  
+  // Diagrammes Mermaid
+  { icon: '🔀', label: 'Flowchart', prompt: 'Génère un diagramme Mermaid de type flowchart (graph TD) pour visualiser le processus ou les étapes décrites. Utilise des formes appropriées : rectangles pour les actions, losanges pour les décisions, cercles pour début/fin.', category: 'mermaid' },
+  { icon: '🔄', label: 'Diagramme séquence', prompt: 'Génère un diagramme Mermaid de type séquence (sequenceDiagram) pour illustrer les interactions entre les acteurs ou systèmes mentionnés.', category: 'mermaid' },
+  { icon: '🧠', label: 'Mind Map', prompt: 'Génère un diagramme Mermaid de type mindmap pour organiser les concepts et idées de cette section de façon hiérarchique.', category: 'mermaid' },
+  { icon: '📦', label: 'Diagramme de classes', prompt: 'Génère un diagramme Mermaid de type classDiagram pour représenter les entités et leurs relations.', category: 'mermaid' },
+  { icon: '🗓️', label: 'Diagramme Gantt', prompt: 'Génère un diagramme Mermaid de type gantt pour planifier les tâches et leurs durées.', category: 'mermaid' },
+  { icon: '🥧', label: 'Graphique circulaire', prompt: 'Génère un diagramme Mermaid de type pie pour représenter les proportions ou répartitions mentionnées.', category: 'mermaid' },
+  { icon: '🔄', label: 'État/Transitions', prompt: 'Génère un diagramme Mermaid de type stateDiagram-v2 pour représenter les différents états et transitions.', category: 'mermaid' },
 ];
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
-  const { getActiveNode, getAllNodes, updateNodeContent, aiConfig, setChatMode } = useStore();
+  const { getActiveNode, getAllNodes, updateNodeContent, aiConfig, setChatMode, setAIConfig } = useStore();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState<number | null>(null);
   const [showTemplates, setShowTemplates] = React.useState(false);
-  const [translationLanguage, setTranslationLanguage] = React.useState('anglais');
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -47,24 +58,40 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   const activeNode = getActiveNode();
   const allNodes = getAllNodes();
 
-  const sendPrompt = async (prompt: string) => {
-    if (!prompt.trim() || loading || !activeNode) return;
+  if (!activeNode) {
+    return (
+      <div className={`bg-gray-50 flex items-center justify-center ${className}`}>
+        <div className="text-center">
+          <p className="text-gray-500">Sélectionnez un nœud pour discuter</p>
+        </div>
+      </div>
+    );
+  }
 
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+
+    // Ajouter le message utilisateur
     const userMessage: ChatMessage = {
       role: 'user',
-      content: prompt,
+      content: input,
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMessage]);
+    setInput('');
     setLoading(true);
 
     try {
+      // Construire le contexte sandwich
       const context = buildContextSandwich(allNodes, activeNode);
       const systemPrompt = buildSystemPrompt(context, aiConfig.chatMode);
-      const messageForAI = buildUserMessage(context, prompt);
+      const messageForAI = buildUserMessage(context, input);
 
+      // Appeler l'IA avec la configuration
       const aiResponse = await callAIAPI(systemPrompt, messageForAI, aiConfig);
 
+      // Ajouter la réponse de l'IA
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: aiResponse,
@@ -85,14 +112,6 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-    const prompt = input;
-    setInput('');
-    await sendPrompt(prompt);
   };
 
   const handleCommit = (messageContent: string, replaceContent: boolean = false) => {
@@ -118,74 +137,22 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const proactiveActions = React.useMemo(() => {
-    const actions: { id: string; label: string; prompt: string }[] = [];
-    if (!activeNode) {
-      return actions;
-    }
-    const trimmedContent = activeNode.content.trim();
-
-    if (!trimmedContent) {
-      actions.push({
-        id: 'plan',
-        label: 'Générer un plan structuré',
-        prompt: 'Propose un plan structuré et hiérarchisé pour cette section.',
-      });
-    }
-
-    if (trimmedContent && trimmedContent.length < 200) {
-      actions.push({
-        id: 'expand',
-        label: 'Développer la section',
-        prompt: 'Développe cette section avec plus de détails et d’arguments.',
-      });
-    }
-
-    actions.push(
-      {
-        id: 'todo',
-        label: 'Todo-list automatique',
-        prompt: 'Analyse le contenu et génère une todo-list claire avec des tâches actionnables.',
-      },
-      {
-        id: 'suggestions',
-        label: 'Suggestions proactives',
-        prompt: 'Identifie les améliorations possibles, sections manquantes et idées à approfondir.',
-      },
-      {
-        id: 'translate',
-        label: `Traduire en ${translationLanguage}`,
-        prompt: `Traduis cette section en ${translationLanguage} en conservant la structure Markdown.`,
-      },
-    );
-
-    return actions;
-  }, [activeNode?.content, translationLanguage]);
-
-  const handleRunAction = async (prompt: string) => {
-    setShowTemplates(false);
-    await sendPrompt(prompt);
-  };
-
-  if (!activeNode) {
-    return (
-      <div className={`bg-gray-50 flex items-center justify-center ${className}`}>
-        <div className="text-center">
-          <p className="text-gray-500">Sélectionnez un nœud pour discuter</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={`bg-white flex flex-col h-full ${className}`}>
       {/* Header */}
       <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50 p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-bold text-gray-900">Assistant IA</h3>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-bold text-gray-900 truncate" title={activeNode.heading}>
+              📄 {activeNode.heading}
+            </h3>
+            <p className="text-sm text-purple-600 font-medium truncate" title={activeNode.meta.agentConfig?.role || 'Assistant IA'}>
+              🤖 <span className="italic">{activeNode.meta.agentConfig?.role || 'Assistant IA (rôle par défaut)'}</span>
+            </p>
+          </div>
           <button
             onClick={onOpenSettings}
-            className="p-2 hover:bg-indigo-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-indigo-100 rounded-lg transition-colors flex-shrink-0 ml-2"
             title="Configurer l'IA"
           >
             <Settings size={18} className="text-indigo-600" />
@@ -207,66 +174,55 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
               Discussion
             </button>
             <button
-              onClick={() => setChatMode('redaction')}
+              onClick={() => setChatMode('structuration')}
               className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                aiConfig.chatMode === 'redaction' 
+                aiConfig.chatMode === 'structuration' 
                   ? 'bg-white shadow text-orange-700' 
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               <FileText size={14} />
-              Rédaction
+              Structuration
             </button>
           </div>
         </div>
 
-        <div className="bg-white/80 border border-gray-200 rounded-lg p-2 mb-2">
-          <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
-            <span className="font-semibold text-gray-700">IA avancée</span>
-            <select
-              value={translationLanguage}
-              onChange={(event) => setTranslationLanguage(event.target.value)}
-              className="text-[11px] border border-gray-200 rounded px-1 py-0.5 bg-white"
-            >
-              <option value="anglais">Anglais</option>
-              <option value="français">Français</option>
-              <option value="espagnol">Espagnol</option>
-              <option value="allemand">Allemand</option>
-            </select>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {proactiveActions.map((action) => (
-              <button
-                key={action.id}
-                onClick={() => handleRunAction(action.prompt)}
-                className="px-2 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 text-[11px] text-indigo-700 transition-colors"
-                disabled={loading}
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="flex items-center gap-2 text-xs">
-          {activeNode.meta.agentConfig?.role && (
-            <span className="text-purple-700">
-              👤 <strong>{activeNode.meta.agentConfig.role}</strong>
-            </span>
-          )}
-          <span className="text-gray-400">•</span>
-          <span className={`px-2 py-0.5 rounded-full ${
+          <div className={`relative flex items-center gap-1 px-2 py-0.5 rounded-full ${
             aiConfig.provider === 'gemini' 
               ? 'bg-blue-100 text-blue-700' 
               : 'bg-green-100 text-green-700'
           }`}>
-            {aiConfig.provider === 'gemini' ? '🔮 ' : '🤖 '}{aiConfig.model}
-          </span>
-          {aiConfig.chatMode === 'redaction' && (
+            <span>{aiConfig.provider === 'gemini' ? '🔮 ' : '🤖 '}</span>
+            <select
+              value={aiConfig.model}
+              onChange={(e) => setAIConfig({ ...aiConfig, model: e.target.value })}
+              className="bg-transparent border-none outline-none text-xs font-medium appearance-none cursor-pointer pr-4"
+              style={{ backgroundImage: 'none' }}
+            >
+              {aiConfig.provider === 'gemini' ? (
+                <>
+                  <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
+                  <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                  <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                </>
+              ) : (
+                <>
+                  <option value="gpt-4o-mini">GPT-4o Mini</option>
+                  <option value="gpt-4o">GPT-4o</option>
+                  <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                </>
+              )}
+            </select>
+            <ChevronDown size={10} className="absolute right-2 pointer-events-none" />
+          </div>
+          {aiConfig.chatMode === 'structuration' && (
             <>
               <span className="text-gray-400">•</span>
               <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                ✍️ Mode Rédaction
+                🏗️ Mode Structuration
               </span>
             </>
           )}
@@ -279,8 +235,8 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
           <div className="text-center text-gray-500 py-8">
             <p className="mb-2">Aucun message pour l'instant.</p>
             <p className="text-xs mb-4">
-              {aiConfig.chatMode === 'redaction' 
-                ? 'Mode Rédaction : les réponses seront prêtes à intégrer au document.'
+              {aiConfig.chatMode === 'structuration' 
+                ? 'Mode Structuration : l\'IA agit comme chef de projet et propose des sous-sections.'
                 : 'Mode Discussion : posez vos questions librement.'}
             </p>
             <p className="text-xs text-gray-400">
@@ -361,20 +317,58 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Templates rapides */}
+      {/* Templates rapides - organisés par catégorie */}
       {showTemplates && (
-        <div className="border-t border-gray-200 bg-white p-3 flex-shrink-0">
-          <div className="grid grid-cols-2 gap-2">
-            {promptTemplates.map((template) => (
-              <button
-                key={template.label}
-                onClick={() => handleUseTemplate(template.prompt)}
-                className="flex items-center gap-2 p-2 text-left text-xs bg-gray-50 hover:bg-purple-50 rounded-lg transition-colors"
-              >
-                <span>{template.icon}</span>
-                <span className="font-medium">{template.label}</span>
-              </button>
-            ))}
+        <div className="border-t border-gray-200 bg-white p-3 flex-shrink-0 max-h-64 overflow-y-auto">
+          {/* Structuration */}
+          <div className="mb-3">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">🏗️ Structuration</h4>
+            <div className="grid grid-cols-2 gap-1.5">
+              {promptTemplates.filter(t => t.category === 'structuration').map((template) => (
+                <button
+                  key={template.label}
+                  onClick={() => handleUseTemplate(template.prompt)}
+                  className="flex items-center gap-2 p-2 text-left text-xs bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border border-transparent rounded-lg transition-colors"
+                >
+                  <span>{template.icon}</span>
+                  <span className="font-medium truncate">{template.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Tableaux */}
+          <div className="mb-3">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📊 Tableaux</h4>
+            <div className="grid grid-cols-2 gap-1.5">
+              {promptTemplates.filter(t => t.category === 'tableau').map((template) => (
+                <button
+                  key={template.label}
+                  onClick={() => handleUseTemplate(template.prompt)}
+                  className="flex items-center gap-2 p-2 text-left text-xs bg-green-50 hover:bg-green-100 hover:border-green-200 border border-transparent rounded-lg transition-colors"
+                >
+                  <span>{template.icon}</span>
+                  <span className="font-medium truncate">{template.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Diagrammes Mermaid */}
+          <div>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📐 Diagrammes Mermaid</h4>
+            <div className="grid grid-cols-2 gap-1.5">
+              {promptTemplates.filter(t => t.category === 'mermaid').map((template) => (
+                <button
+                  key={template.label}
+                  onClick={() => handleUseTemplate(template.prompt)}
+                  className="flex items-center gap-2 p-2 text-left text-xs bg-purple-50 hover:bg-purple-100 hover:border-purple-200 border border-transparent rounded-lg transition-colors"
+                >
+                  <span>{template.icon}</span>
+                  <span className="font-medium truncate">{template.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -402,8 +396,8 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={aiConfig.chatMode === 'redaction' 
-              ? "Décrivez le contenu à générer..." 
+            placeholder={aiConfig.chatMode === 'structuration' 
+              ? "Demandez une analyse ou structuration..." 
               : "Posez une question..."
             }
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"

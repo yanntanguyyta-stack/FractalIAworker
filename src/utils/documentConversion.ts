@@ -1,4 +1,4 @@
-import * as mammoth from 'mammoth/mammoth.browser';
+import { extractRawText } from 'mammoth/mammoth.browser';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
 import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 
@@ -45,7 +45,7 @@ async function extractTextFromPdf(file: File): Promise<string> {
 
 async function extractTextFromDocx(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
-  const result = await mammoth.extractRawText({ arrayBuffer });
+  const result = await extractRawText({ arrayBuffer });
   return result.value.trim();
 }
 

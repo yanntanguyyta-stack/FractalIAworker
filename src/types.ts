@@ -30,6 +30,8 @@ export type UIConfig = z.infer<typeof UIConfigSchema>;
 export const NodeEvaluationSchema = z.object({
   completenessScore: z.number().min(0).max(10).optional(),
   questionScore: z.number().min(0).max(10).optional(),
+  inheritedCompletenessScore: z.number().min(0).max(10).optional(),
+  inheritedQuestionScore: z.number().min(0).max(10).optional(),
 }).strict();
 
 export type NodeEvaluation = z.infer<typeof NodeEvaluationSchema>;

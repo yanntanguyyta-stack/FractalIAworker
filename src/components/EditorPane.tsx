@@ -20,6 +20,7 @@ import {
   Check,
   ChevronRight,
   Home,
+  RefreshCw,
 } from 'lucide-react';
 
 // Initialiser Mermaid
@@ -36,7 +37,7 @@ interface EditorPaneProps {
 type ViewMode = 'edit' | 'preview' | 'split';
 
 const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
-  const { getActiveNode, updateNodeContent, getNodePath, selectNode, activeNodeId, assessmentConfig, updateNodeAssessment } = useStore();
+  const { getActiveNode, updateNodeContent, getNodePath, selectNode, activeNodeId, assessmentConfig, updateNodeAssessment, recalculateAllInheritedScores } = useStore();
   const activeNode = getActiveNode();
   const nodePath = activeNodeId ? getNodePath(activeNodeId) : [];
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
@@ -87,6 +88,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   const evaluation = activeNode.meta.evaluation;
   const completenessScore = evaluation?.completenessScore ?? 0;
   const questionScore = evaluation?.questionScore ?? 0;
+  const inheritedCompleteness = evaluation?.inheritedCompletenessScore;
+  const inheritedQuestion = evaluation?.inheritedQuestionScore;
+  const hasChildren = activeNode.children.length > 0;
 
   const handleScoreChange = (key: 'completenessScore' | 'questionScore') =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,38 +169,79 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
 
   // Convertir le Markdown en HTML simple pour la preview
   const renderPreview = (content: string) => {
-    // Remplacer les blocs Mermaid par des divs spéciaux
-    let html = content.replace(/```mermaid\n([\s\S]*?)```/g, '<div class="mermaid">$1</div>');
+    // Remplacer les blocs Mermaid par des divs spéciaux avec style amélioré
+    let html = content.replace(
+      /```mermaid\n([\s\S]*?)```/g, 
+      '<div class="mermaid-container my-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm"><div class="mermaid">$1</div></div>'
+    );
+    
+    // Remplacer les blocs de code standard
+    html = html.replace(
+      /```(\w+)?\n([\s\S]*?)```/g,
+      '<pre class="bg-gray-900 text-gray-100 p-4 rounded-lg my-4 overflow-x-auto text-sm font-mono shadow-inner"><code>$2</code></pre>'
+    );
 
     // Markdown basique
     html = html
-      // Titres
-      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-6 mb-3">$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-6 mb-4">$1</h1>')
+      // Titres avec meilleur style
+      .replace(/^#### (.+)$/gm, '<h4 class="text-base font-bold mt-3 mb-1 text-gray-800">$1</h4>')
+      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-4 mb-2 text-gray-800 border-b border-gray-200 pb-1">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-6 mb-3 text-gray-900 border-b-2 border-blue-200 pb-2">$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-6 mb-4 text-gray-900">$1</h1>')
       // Gras et italique
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
       // Code inline
-      .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
+      // Cases à cocher
+      .replace(/^- \[x\] (.+)$/gm, '<li class="ml-4 flex items-center gap-2"><span class="text-green-600">✅</span> <span class="line-through text-gray-500">$1</span></li>')
+      .replace(/^- \[ \] (.+)$/gm, '<li class="ml-4 flex items-center gap-2"><span class="text-gray-400">☐</span> $1</li>')
       // Listes
-      .replace(/^- (.+)$/gm, '<li class="ml-4">• $1</li>')
-      .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal">$1</li>')
-      // Citations
-      .replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 pl-4 italic text-gray-600 my-2">$1</blockquote>')
+      .replace(/^- (.+)$/gm, '<li class="ml-4 py-0.5">• $1</li>')
+      .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal py-0.5">$1</li>')
+      // Citations avec meilleur style
+      .replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 italic text-gray-700 my-3 rounded-r">$1</blockquote>')
       // Liens
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:underline" target="_blank">$1</a>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 hover:underline font-medium" target="_blank">$1</a>')
       // Lignes horizontales
-      .replace(/^---$/gm, '<hr class="my-4 border-gray-300" />')
-      // Tableaux (simple)
-      .replace(/\|(.+)\|/g, (match) => {
-        const cells = match.split('|').filter(c => c.trim());
-        if (cells.some(c => c.match(/^[-:]+$/))) {
-          return ''; // Skip separator row
+      .replace(/^---$/gm, '<hr class="my-6 border-gray-300" />');
+    
+    // Tableaux améliorés - détection et rendu complet
+    html = html.replace(/((\|.+\|\n?)+)/g, (tableMatch) => {
+      const rows = tableMatch.trim().split('\n').filter(row => row.trim());
+      if (rows.length < 2) return tableMatch;
+      
+      let tableHtml = '<div class="overflow-x-auto my-4"><table class="min-w-full border-collapse border border-gray-300 rounded-lg overflow-hidden shadow-sm">';
+      
+      rows.forEach((row, index) => {
+        const cells = row.split('|').filter(c => c.trim());
+        // Skip separator row
+        if (cells.some(c => c.match(/^[-:]+$/))) return;
+        
+        if (index === 0) {
+          // Header row
+          tableHtml += '<thead class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"><tr>';
+          cells.forEach(cell => {
+            tableHtml += `<th class="px-4 py-3 text-left font-semibold text-sm uppercase tracking-wider">${cell.trim()}</th>`;
+          });
+          tableHtml += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+        } else {
+          // Data rows
+          const rowClass = index % 2 === 0 ? 'bg-gray-50' : 'bg-white';
+          tableHtml += `<tr class="${rowClass} hover:bg-blue-50 transition-colors">`;
+          cells.forEach(cell => {
+            tableHtml += `<td class="px-4 py-3 text-sm text-gray-700">${cell.trim()}</td>`;
+          });
+          tableHtml += '</tr>';
         }
-        return `<tr>${cells.map(c => `<td class="border border-gray-300 px-3 py-2">${c.trim()}</td>`).join('')}</tr>`;
-      })
-      // Paragraphes
+      });
+      
+      tableHtml += '</tbody></table></div>';
+      return tableHtml;
+    });
+    
+    // Paragraphes
+    html = html
       .replace(/\n\n/g, '</p><p class="my-2">')
       .replace(/\n/g, '<br />');
 
@@ -270,11 +315,39 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
         <div className="border-b border-gray-200 bg-white/80 backdrop-blur p-3 flex-shrink-0">
           <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
             <span className="font-semibold text-gray-700">Évaluation de complétude</span>
-            <span>Scores /10</span>
+            <button
+              onClick={() => recalculateAllInheritedScores()}
+              className="flex items-center gap-1 px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded transition-colors"
+              title="Recalculer les notes héritées"
+            >
+              <RefreshCw size={12} />
+              <span>Recalculer</span>
+            </button>
           </div>
           <div className="text-xs text-gray-500 mb-3">
             Question personnalisée : {assessmentConfig.question || 'Définissez une question globale dans les paramètres.'}
           </div>
+          
+          {/* Notes héritées des enfants */}
+          {hasChildren && (inheritedCompleteness !== undefined || inheritedQuestion !== undefined) && (
+            <div className="mb-3 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <div className="text-xs font-semibold text-blue-700 mb-2">📊 Notes héritées (moyenne des {activeNode.children.length} enfants)</div>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-blue-600">Complétude:</span>
+                  <span className="font-bold text-blue-800">{inheritedCompleteness?.toFixed(1) ?? '-'}/10</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-blue-600">Question:</span>
+                  <span className="font-bold text-blue-800">{inheritedQuestion?.toFixed(1) ?? '-'}/10</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {hasChildren && (
+            <div className="text-xs font-semibold text-gray-600 mb-1">📝 Notes propres (ce nœud)</div>
+          )}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-600 w-40">Complétude du nœud</span>

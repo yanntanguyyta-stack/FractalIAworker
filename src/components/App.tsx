@@ -6,8 +6,11 @@ import EditorPane from './EditorPane';
 import ChatPane from './ChatPane';
 import SettingsModal from './SettingsModal';
 import NewDocumentWizard from './NewDocumentWizard';
-import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer } from 'lucide-react';
+import OnboardingWizard from './OnboardingWizard';
+import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle } from 'lucide-react';
 import { buildHtmlDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
+
+const ONBOARDING_COMPLETED_KEY = 'fractalia_onboarding_completed';
 
 interface AppProps {
   className?: string;
@@ -22,6 +25,14 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
   const [isImporting, setIsImporting] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const dragCounter = useRef(0);
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
+  });
+
+  const handleCloseOnboarding = useCallback(() => {
+    setOnboardingOpen(false);
+    localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
+  }, []);
   
   // État pour les largeurs des panneaux (en pourcentage)
   const [sidebarWidth, setSidebarWidth] = useState(20);
@@ -347,6 +358,15 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
               <Settings size={18} />
               {aiConfig.apiKey ? 'IA Configurée' : 'Configurer IA'}
             </button>
+
+            <button
+              onClick={() => setOnboardingOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
+              title="Aide et tutoriel"
+            >
+              <HelpCircle size={18} />
+              Aide
+            </button>
           </div>
         </div>
       </div>
@@ -426,6 +446,13 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
       {/* Wizard Nouveau Document */}
       <NewDocumentWizard isOpen={newDocWizardOpen} onClose={() => setNewDocWizardOpen(false)} />
+
+      {/* Onboarding pour les nouveaux utilisateurs */}
+      <OnboardingWizard 
+        isOpen={onboardingOpen} 
+        onClose={handleCloseOnboarding}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
     </div>
   );
 };

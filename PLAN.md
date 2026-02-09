@@ -82,23 +82,65 @@ Rendre l'interface testable et fonctionnelle avec un appel réel aux APIs IA.
 
 ## 🔲 Phase 5 : Fonctionnalités avancées (FUTUR)
 
-### 5.1 Collaboration et export
+### 5.1 Import intelligent de fichiers
+**Objectif** : Permettre l'importation de fichiers externes avec formatage IA automatique pour intégration au document.
+
+- [ ] Interface d'upload de fichiers (drag & drop + sélecteur)
+- [ ] Support des formats : TXT, MD, PDF, DOCX, HTML
+- [ ] Parsing et extraction du contenu textuel
+- [ ] Formatage IA : restructuration en Markdown conforme à la hiérarchie du document
+- [ ] Prévisualisation avant intégration
+- [ ] Choix du nœud de destination dans l'arborescence
+- [ ] Option de création automatique de sous-nœuds depuis les sections détectées
+
+### 5.2 Collaboration et export
 - [ ] Export en PDF
 - [ ] Export en HTML standalone
 - [ ] Export en DOCX (optionnel)
 - [ ] Partage de document via lien (nécessite backend)
 
-### 5.2 Gestion des nœuds
+### 5.3 Gestion des nœuds
 - [ ] Drag & Drop pour réorganiser les nœuds
 - [ ] Copier/Coller des nœuds
 - [ ] Recherche dans tous les nœuds
 - [ ] Filtrage par type de nœud
 
-### 5.3 IA avancée
+### 5.4 IA avancée
 - [ ] Génération automatique de todo-list depuis le contenu
 - [ ] Détection de sections incomplètes
 - [ ] Suggestions proactives de l'IA
 - [ ] Traduction de sections
+
+### 5.5 Tests et qualité
+**Objectif** : Assurer une couverture de tests suffisante pour garantir la stabilité et la maintenabilité du projet.
+
+- [ ] Mise en place de l'infrastructure de tests (Vitest + React Testing Library)
+- [ ] Tests unitaires des fonctions utilitaires (store, aiService, markdownEngine)
+- [ ] Tests de composants React (Sidebar, EditorPane, ChatPane, etc.)
+- [ ] Tests d'intégration des flux utilisateur principaux
+- [ ] Configuration du rapport de couverture de code
+- [ ] Objectif : couverture minimale de 70%
+
+### 5.6 Parcours d'onboarding
+**Objectif** : Guider les nouveaux utilisateurs à travers les fonctionnalités de l'application.
+
+- [ ] Bouton "Présentation" accessible depuis l'interface principale
+- [ ] Tour guidé interactif des fonctionnalités principales
+- [ ] Mise en évidence des éléments UI avec explications contextuelles
+- [ ] Étapes du parcours : Sidebar → Éditeur → Chat IA → Modes de vue → Toolbar
+- [ ] Option de ne plus afficher au démarrage (localStorage)
+- [ ] Possibilité de relancer le tour à tout moment
+
+### 5.7 Gestion multi-documents
+**Objectif** : Permettre la gestion de plusieurs documents avec import/export en masse.
+
+- [ ] Interface de gestion de bibliothèque de documents
+- [ ] Liste des documents avec métadonnées (titre, date, taille)
+- [ ] Création, suppression et sélection de documents
+- [ ] Export de tous les documents en un seul fichier (ZIP ou JSON)
+- [ ] Import en masse depuis un fichier d'archive
+- [ ] Persistance des documents dans localStorage ou IndexedDB
+- [ ] Gestion des conflits lors de l'import
 
 ---
 

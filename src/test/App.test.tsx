@@ -1,0 +1,412 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import App from '../components/App';
+import { useStore } from '../store';
+
+// Mock URL.createObjectURL
+global.URL.createObjectURL = vi.fn(() => 'mock-url');
+global.URL.revokeObjectURL = vi.fn();
+
+// Mock confirm et alert
+global.confirm = vi.fn(() => true);
+global.alert = vi.fn();
+
+// Reset le store avant chaque test
+beforeEach(() => {
+  vi.clearAllMocks();
+  useStore.setState({
+    tree: [],
+    activeNodeId: null,
+    markdown: '',
+    aiConfig: {
+      provider: 'gemini',
+      apiKey: '',
+      model: 'gemini-1.5-flash',
+      chatMode: 'discussion',
+    },
+    assessmentConfig: {
+      enabled: false,
+      question: '',
+    },
+  });
+});
+
+describe('App', () => {
+  it('devrait rendre l\'application avec le titre', () => {
+    render(<App />);
+    
+    expect(screen.getByText(/IRLM Node Interface/i)).toBeInTheDocument();
+  });
+
+  it('devrait charger les données initiales au montage', async () => {
+    render(<App />);
+    
+    // Après le montage, le store devrait avoir des données
+    await waitFor(() => {
+      expect(useStore.getState().tree.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('devrait afficher le bouton Nouveau', () => {
+    render(<App />);
+    
+    expect(screen.getByText('Nouveau')).toBeInTheDocument();
+  });
+
+  it('devrait afficher le bouton Charger', () => {
+    render(<App />);
+    
+    expect(screen.getByText('Charger')).toBeInTheDocument();
+  });
+
+  it('devrait afficher le bouton Télécharger', () => {
+    render(<App />);
+    
+    expect(screen.getByText('Télécharger')).toBeInTheDocument();
+  });
+
+  it('devrait afficher le bouton Paramètres', () => {
+    render(<App />);
+    
+    // Le bouton paramètres a le titre "Configuration IA"
+    const settingsButton = screen.getByTitle(/Configuration IA/i);
+    expect(settingsButton).toBeInTheDocument();
+  });
+
+  it('devrait ouvrir le modal des paramètres', async () => {
+    render(<App />);
+    
+    const settingsButton = screen.getByTitle(/Configuration IA/i);
+    fireEvent.click(settingsButton);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Configuration IA' })).toBeInTheDocument();
+    });
+  });
+
+  it('devrait ouvrir le wizard de nouveau document', async () => {
+    render(<App />);
+    
+    const newButton = screen.getByText('Nouveau');
+    fireEvent.click(newButton);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/Créer un nouveau document/i)).toBeInTheDocument();
+    });
+  });
+
+  it('devrait réinitialiser avec les données par défaut', async () => {
+    render(<App />);
+    
+    const resetButton = screen.getByTitle(/Réinitialiser/i);
+    fireEvent.click(resetButton);
+    
+    expect(global.confirm).toHaveBeenCalled();
+  });
+
+  it('devrait appliquer les classes CSS personnalisées', () => {
+    const { container } = render(<App className="custom-class" />);
+    
+    expect(container.querySelector('.custom-class')).toBeInTheDocument();
+  });
+
+  it('devrait rendre le Sidebar', () => {
+    render(<App />);
+    
+    // Le sidebar contient l'icône FolderTree et le texte "Structure"
+    expect(screen.getByText('Structure')).toBeInTheDocument();
+  });
+
+  it('devrait rendre le ChatPane', async () => {
+    render(<App />);
+    
+    await waitFor(() => {
+      // Le ChatPane contient "Assistant IA"
+      expect(screen.getByText(/Assistant IA/i)).toBeInTheDocument();
+    });
+  });
+
+  it('devrait permettre le redimensionnement des panneaux', () => {
+    render(<App />);
+    
+    // Les séparateurs de redimensionnement sont présents
+    const resizers = document.querySelectorAll('[class*="cursor-col-resize"]');
+    expect(resizers.length).toBeGreaterThan(0);
+  });
+
+  it('devrait migrer les anciens modèles Gemini', async () => {
+    // Configurer un ancien modèle
+    useStore.setState({
+      aiConfig: {
+        provider: 'gemini',
+        apiKey: 'key',
+        model: 'gemini-3.0-pro',
+        chatMode: 'discussion',
+      },
+    });
+    
+    render(<App />);
+    
+    // Le modèle devrait être migré
+    await waitFor(() => {
+      expect(useStore.getState().aiConfig.model).toBe('gemini-3-pro-preview');
+    });
+  });
+});
+
+describe('App - Gestion des fichiers', () => {
+  it('devrait télécharger le markdown', async () => {
+    render(<App />);
+    
+    // Charger du contenu d'abord
+    await waitFor(() => {
+      expect(useStore.getState().tree.length).toBeGreaterThan(0);
+    });
+    
+    const downloadButton = screen.getByText('Télécharger');
+    
+    // Mock createElement pour capturer le téléchargement
+    const mockClick = vi.fn();
+    const mockRemove = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const element = originalCreateElement(tag);
+      if (tag === 'a') {
+        element.click = mockClick;
+      }
+      return element;
+    });
+    
+    fireEvent.click(downloadButton);
+    
+    expect(mockClick).toHaveBeenCalled();
+  });
+
+  it('devrait gérer le chargement de fichier', async () => {
+    render(<App />);
+    
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toBeInTheDocument();
+    
+    // Simuler un fichier avec une méthode text() qui retourne une promesse
+    const mockText = vi.fn().mockResolvedValue('# Nouveau Contenu\n\nTexte du fichier');
+    const file = {
+      text: mockText,
+      name: 'test.md',
+      type: 'text/markdown',
+    } as unknown as File;
+    
+    if (fileInput) {
+      Object.defineProperty(fileInput, 'files', {
+        value: [file],
+        writable: true,
+      });
+      fireEvent.change(fileInput);
+      
+      await waitFor(() => {
+        // La fonction text() devrait être appelée
+        expect(mockText).toHaveBeenCalled();
+      }, { timeout: 3000 });
+      
+      await waitFor(() => {
+        // Le contenu devrait être chargé
+        const tree = useStore.getState().tree;
+        expect(tree.length).toBeGreaterThan(0);
+      }, { timeout: 3000 });
+    }
+  });
+
+  it('devrait afficher une erreur lors d\'un fichier invalide', async () => {
+    render(<App />);
+    
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toBeInTheDocument();
+    
+    // Simuler un fichier qui génère une erreur
+    const mockText = vi.fn().mockRejectedValue(new Error('Erreur de lecture'));
+    const file = {
+      text: mockText,
+      name: 'error.md',
+    } as unknown as File;
+    
+    if (fileInput) {
+      Object.defineProperty(fileInput, 'files', {
+        value: [file],
+      });
+      fireEvent.change(fileInput);
+      
+      await waitFor(() => {
+        expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('Erreur'));
+      }, { timeout: 3000 });
+    }
+  });
+
+  it('devrait ouvrir le sélecteur de fichier quand on clique sur Charger', () => {
+    render(<App />);
+    
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+    
+    // Mock le click sur l'input
+    const mockInputClick = vi.fn();
+    fileInput.click = mockInputClick;
+    
+    // Cliquer sur le bouton Charger
+    const loadButton = screen.getByTitle('Charger un fichier Markdown');
+    fireEvent.click(loadButton);
+    
+    expect(mockInputClick).toHaveBeenCalled();
+  });
+});
+
+describe('App - Redimensionnement', () => {
+  it('devrait gérer le redimensionnement du sidebar', async () => {
+    render(<App />);
+    
+    // Trouver le séparateur
+    const resizers = document.querySelectorAll('[class*="cursor-col-resize"]');
+    expect(resizers.length).toBeGreaterThan(0);
+    
+    // Simuler le drag du premier séparateur (sidebar)
+    const sidebarResizer = resizers[0];
+    fireEvent.mouseDown(sidebarResizer);
+    
+    // Simuler le mouvement de souris
+    fireEvent.mouseMove(document, { clientX: 300 });
+    fireEvent.mouseUp(document);
+    
+    // Le test vérifie que le redimensionnement ne plante pas
+    expect(sidebarResizer).toBeInTheDocument();
+  });
+
+  it('devrait gérer le redimensionnement de l\'éditeur', async () => {
+    render(<App />);
+    
+    const resizers = document.querySelectorAll('[class*="cursor-col-resize"]');
+    expect(resizers.length).toBeGreaterThan(1);
+    
+    // Le deuxième séparateur est pour l'éditeur
+    const editorResizer = resizers[1];
+    fireEvent.mouseDown(editorResizer);
+    fireEvent.mouseMove(document, { clientX: 500 });
+    fireEvent.mouseUp(document);
+    
+    expect(editorResizer).toBeInTheDocument();
+  });
+});
+
+describe('App - Migration de modèles', () => {
+  it('devrait migrer gemini-3.0-flash vers gemini-3-flash-preview', async () => {
+    useStore.setState({
+      aiConfig: {
+        provider: 'gemini',
+        apiKey: 'key',
+        model: 'gemini-3.0-flash',
+        chatMode: 'discussion',
+      },
+    });
+    
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(useStore.getState().aiConfig.model).toBe('gemini-3-flash-preview');
+    });
+  });
+});
+
+describe('App - Intégration ChatPane', () => {
+  it('devrait ouvrir les paramètres depuis le ChatPane', async () => {
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(useStore.getState().tree.length).toBeGreaterThan(0);
+    });
+    
+    // Sélectionner un nœud pour afficher le chat
+    const nodeId = useStore.getState().tree[0].id;
+    useStore.getState().selectNode(nodeId);
+    
+    // Chercher le bouton paramètres dans le ChatPane (icône Settings dans header)
+    const settingsButtons = screen.getAllByTitle(/Configuration IA/i);
+    if (settingsButtons.length > 1) {
+      // Le premier est dans la barre du haut, le second dans ChatPane
+      fireEvent.click(settingsButtons[0]);
+      
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Configuration IA' })).toBeInTheDocument();
+      });
+    }
+  });
+
+  it('devrait afficher le footer avec les informations', async () => {
+    render(<App />);
+    
+    await waitFor(() => {
+      expect(useStore.getState().tree.length).toBeGreaterThan(0);
+    });
+    
+    // Vérifier que le footer est présent
+    expect(screen.getByText(/nœuds racine chargés/)).toBeInTheDocument();
+    expect(screen.getByText(/Version 2.0/)).toBeInTheDocument();
+    expect(screen.getByText(/Local-First Architecture/)).toBeInTheDocument();
+  });
+
+  it('devrait afficher l\'input file hidden', () => {
+    render(<App />);
+    
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toBeInTheDocument();
+    expect(fileInput).toHaveClass('hidden');
+    expect(fileInput?.getAttribute('accept')).toBe('.md,.markdown,.txt');
+  });
+
+  it('devrait fermer le modal des paramètres', async () => {
+    render(<App />);
+    
+    // Ouvrir le modal
+    const settingsButton = screen.getByTitle(/Configuration IA/i);
+    fireEvent.click(settingsButton);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Configuration IA' })).toBeInTheDocument();
+    });
+    
+    // Fermer le modal
+    const cancelButton = screen.getByText('Annuler');
+    fireEvent.click(cancelButton);
+    
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Configuration IA' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('devrait fermer le wizard nouveau document', async () => {
+    render(<App />);
+    
+    // Ouvrir le wizard
+    const newButton = screen.getByText('Nouveau');
+    fireEvent.click(newButton);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/Créer un nouveau document/i)).toBeInTheDocument();
+    });
+    
+    // Fermer le wizard en cliquant sur Annuler
+    const cancelButton = screen.getByText('Annuler');
+    fireEvent.click(cancelButton);
+    
+    await waitFor(() => {
+      expect(screen.queryByText(/Créer un nouveau document/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('devrait afficher tous les éléments du header', () => {
+    render(<App />);
+    
+    // Vérifier les boutons du header
+    expect(screen.getByText('Nouveau')).toBeInTheDocument();
+    expect(screen.getByText('Charger')).toBeInTheDocument();
+    expect(screen.getByText('Télécharger')).toBeInTheDocument();
+    expect(screen.getByText('Réinitialiser')).toBeInTheDocument();
+  });
+});

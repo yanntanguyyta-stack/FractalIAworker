@@ -11,7 +11,7 @@ import {
 
 // Configuration IA
 export type AIProvider = 'gemini' | 'openai';
-export type ChatMode = 'discussion' | 'redaction';
+export type ChatMode = 'discussion' | 'structuration';
 
 export interface AIConfig {
   provider: AIProvider;
@@ -58,6 +58,10 @@ interface EditorState {
   // Actions Évaluation
   setAssessmentConfig: (config: AssessmentConfig) => void;
   updateNodeAssessment: (nodeId: string, updates: Partial<NodeData['meta']['evaluation']>) => void;
+  
+  // Calcul des notes héritées
+  getInheritedScores: (nodeId: string) => { completenessScore: number; questionScore: number } | null;
+  recalculateAllInheritedScores: () => void;
 }
 
 // Générer un ID simple
@@ -389,6 +393,90 @@ export const useStore = create<EditorState>()(
       const updated = updateNodeInTree(tree, nodeId, { meta: updatedMeta });
       set({ tree: updated });
     }
+  },
+
+  // Calcule les notes héritées d'un nœud (moyenne des enfants directs)
+  getInheritedScores: (nodeId: string) => {
+    const { tree } = get();
+    const node = findNodeById(tree, nodeId);
+    if (!node || node.children.length === 0) return null;
+
+    let totalCompleteness = 0;
+    let totalQuestion = 0;
+    let count = 0;
+
+    for (const child of node.children) {
+      const childScore = child.meta.evaluation;
+      if (childScore) {
+        totalCompleteness += childScore.completenessScore ?? 0;
+        totalQuestion += childScore.questionScore ?? 0;
+        count++;
+      }
+    }
+
+    if (count === 0) return null;
+
+    return {
+      completenessScore: Math.round((totalCompleteness / count) * 10) / 10,
+      questionScore: Math.round((totalQuestion / count) * 10) / 10,
+    };
+  },
+
+  // Recalcule les notes héritées pour tous les nœuds (bottom-up)
+  recalculateAllInheritedScores: () => {
+    const { tree } = get();
+
+    // Fonction récursive qui calcule les scores bottom-up
+    function calculateScores(nodes: NodeData[]): NodeData[] {
+      return nodes.map(node => {
+        // D'abord, traiter les enfants récursivement
+        const updatedChildren = node.children.length > 0 
+          ? calculateScores(node.children) 
+          : node.children;
+
+        // Si le nœud a des enfants, calculer les scores hérités
+        if (updatedChildren.length > 0) {
+          let totalCompleteness = 0;
+          let totalQuestion = 0;
+          let count = 0;
+
+          for (const child of updatedChildren) {
+            const childEval = child.meta.evaluation;
+            if (childEval) {
+              totalCompleteness += childEval.completenessScore ?? 0;
+              totalQuestion += childEval.questionScore ?? 0;
+              count++;
+            }
+          }
+
+          if (count > 0) {
+            const inheritedCompleteness = Math.round((totalCompleteness / count) * 10) / 10;
+            const inheritedQuestion = Math.round((totalQuestion / count) * 10) / 10;
+            
+            return {
+              ...node,
+              children: updatedChildren,
+              meta: {
+                ...node.meta,
+                evaluation: {
+                  ...node.meta.evaluation,
+                  inheritedCompletenessScore: inheritedCompleteness,
+                  inheritedQuestionScore: inheritedQuestion,
+                },
+              },
+            };
+          }
+        }
+
+        return {
+          ...node,
+          children: updatedChildren,
+        };
+      });
+    }
+
+    const updatedTree = calculateScores(tree);
+    set({ tree: updatedTree });
   },
     }),
     {
