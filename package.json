@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.6.1",
     "lucide-react": "^0.366.0",
     "mammoth": "^1.11.0",
     "mdast-util-find-and-replace": "^3.0.0",
