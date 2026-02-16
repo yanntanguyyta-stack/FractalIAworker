@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useStore } from '../store';
+import { useStore, DOCUMENT_ROOT_ID } from '../store';
 import mermaid from 'mermaid';
 import {
   Bold,
@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Home,
   RefreshCw,
+  FileText,
 } from 'lucide-react';
 
 // Initialiser Mermaid
@@ -37,9 +38,22 @@ interface EditorPaneProps {
 type ViewMode = 'edit' | 'preview' | 'split';
 
 const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
-  const { getActiveNode, updateNodeContent, getNodePath, selectNode, activeNodeId, assessmentConfig, updateNodeAssessment, recalculateAllInheritedScores } = useStore();
+  const { 
+    getActiveNode, 
+    updateNodeContent, 
+    getNodePath, 
+    selectNode, 
+    activeNodeId, 
+    assessmentConfig, 
+    updateNodeAssessment, 
+    recalculateAllInheritedScores,
+    getNodeFullContent,
+    isDocumentRootSelected,
+    tree
+  } = useStore();
   const activeNode = getActiveNode();
-  const nodePath = activeNodeId ? getNodePath(activeNodeId) : [];
+  const isDocRoot = isDocumentRootSelected();
+  const nodePath = activeNodeId && activeNodeId !== DOCUMENT_ROOT_ID ? getNodePath(activeNodeId) : [];
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
   const [copied, setCopied] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -47,15 +61,22 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   const previewRef = useRef<HTMLDivElement>(null);
   const prevNodeIdRef = useRef<string | null>(null);
 
+  // Forcer le mode preview quand H0 est sélectionné
+  useEffect(() => {
+    if (isDocRoot) {
+      setViewMode('preview');
+    }
+  }, [isDocRoot]);
+
   // Animation lors du changement de nœud
   useEffect(() => {
-    if (activeNode && prevNodeIdRef.current !== activeNode.id) {
+    if (activeNodeId && prevNodeIdRef.current !== activeNodeId) {
       setIsTransitioning(true);
       const timer = setTimeout(() => setIsTransitioning(false), 250);
-      prevNodeIdRef.current = activeNode.id;
+      prevNodeIdRef.current = activeNodeId;
       return () => clearTimeout(timer);
     }
-  }, [activeNode?.id]);
+  }, [activeNodeId]);
 
   // Render Mermaid diagrams
   useEffect(() => {
@@ -64,16 +85,20 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
       mermaidDivs.forEach(async (div, index) => {
         const code = div.textContent || '';
         try {
-          const { svg } = await mermaid.render(`mermaid-${activeNode?.id}-${index}`, code);
+          const { svg } = await mermaid.render(`mermaid-${activeNodeId}-${index}`, code);
           div.innerHTML = svg;
         } catch (e) {
           div.innerHTML = `<pre class="text-red-500 text-sm">Erreur Mermaid: ${e}</pre>`;
         }
       });
     }
-  }, [viewMode, activeNode?.content]);
+  }, [viewMode, activeNodeId, activeNode?.content]);
 
-  if (!activeNode) {
+  // Obtenir le contenu complet à afficher (nœud + enfants)
+  const fullContent = getNodeFullContent(activeNodeId);
+  
+  // Si ni H0 ni nœud actif, afficher un message
+  if (!isDocRoot && !activeNode) {
     return (
       <div
         className={`bg-gray-50 border-r border-gray-200 flex items-center justify-center ${className}`}
@@ -85,20 +110,24 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
     );
   }
 
-  const evaluation = activeNode.meta.evaluation;
+  // Données pour l'évaluation (uniquement si un nœud spécifique est sélectionné)
+  const evaluation = activeNode?.meta?.evaluation;
   const completenessScore = evaluation?.completenessScore ?? 0;
   const questionScore = evaluation?.questionScore ?? 0;
   const inheritedCompleteness = evaluation?.inheritedCompletenessScore;
   const inheritedQuestion = evaluation?.inheritedQuestionScore;
-  const hasChildren = activeNode.children.length > 0;
+  const hasChildren = activeNode ? activeNode.children.length > 0 : tree.length > 0;
 
   const handleScoreChange = (key: 'completenessScore' | 'questionScore') =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      updateNodeAssessment(activeNode.id, { [key]: Number(event.target.value) });
+      if (activeNode) {
+        updateNodeAssessment(activeNode.id, { [key]: Number(event.target.value) });
+      }
     };
 
-  // Insérer du texte à la position du curseur
+  // Insérer du texte à la position du curseur (uniquement si un nœud est sélectionné)
   const insertText = (before: string, after: string = '', placeholder: string = '') => {
+    if (!activeNode) return;
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -162,7 +191,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   ];
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(activeNode.content);
+    // Copier le contenu complet (nœud + enfants) ou juste le contenu du nœud actif
+    const contentToCopy = isDocRoot ? fullContent : (activeNode?.content || fullContent);
+    navigator.clipboard.writeText(contentToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -251,12 +282,20 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   return (
     <div className={`bg-white border-r border-gray-200 flex flex-col h-full ${className} ${isTransitioning ? 'node-transition' : ''}`}>
       {/* Breadcrumb - Fil d'Ariane */}
-      {nodePath.length > 1 && (
+      {/* Breadcrumb - uniquement si nœud spécifique sélectionné */}
+      {!isDocRoot && nodePath.length > 0 && (
         <div className="border-b border-gray-100 bg-gray-50 px-3 py-1.5 flex items-center gap-1 text-xs overflow-x-auto flex-shrink-0">
-          <Home size={12} className="text-gray-400 flex-shrink-0" />
+          <button
+            onClick={() => selectNode(DOCUMENT_ROOT_ID)}
+            className="hover:bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1"
+            title="Document complet"
+          >
+            <FileText size={12} className="text-gray-400 flex-shrink-0" />
+            <span>Document</span>
+          </button>
           {nodePath.map((node, index) => (
             <React.Fragment key={node.id}>
-              {index > 0 && <ChevronRight size={12} className="text-gray-300 flex-shrink-0" />}
+              <ChevronRight size={12} className="text-gray-300 flex-shrink-0" />
               <button
                 onClick={() => selectNode(node.id)}
                 className={`px-1.5 py-0.5 rounded transition-colors truncate max-w-[120px] ${
@@ -277,7 +316,14 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
       <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50 p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-bold text-gray-900 truncate flex-1">
-            {activeNode.heading}
+            {isDocRoot ? (
+              <span className="flex items-center gap-2">
+                <FileText size={20} className="text-indigo-600" />
+                Document complet
+              </span>
+            ) : (
+              activeNode?.heading || 'Sans titre'
+            )}
           </h3>
           <button
             onClick={handleCopy}
@@ -289,29 +335,37 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
         </div>
 
         <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
-          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-            H{activeNode.headingDepth} • {activeNode.meta.type}
-          </span>
-          {activeNode.meta.agentConfig?.role && (
-            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
-              🤖 {activeNode.meta.agentConfig.role}
+          {isDocRoot ? (
+            <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">
+              H0 • Document racine • {tree.length} nœud(s) racine(s)
             </span>
-          )}
-          {activeNode.meta.contextConfig?.isGlobal && (
-            <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-              ✓ Global
-            </span>
-          )}
-          {activeNode.children.length > 0 && (
-            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">
-              📁 {activeNode.children.length} enfant(s)
-            </span>
+          ) : activeNode && (
+            <>
+              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                H{activeNode.headingDepth} • {activeNode.meta.type}
+              </span>
+              {activeNode.meta.agentConfig?.role && (
+                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
+                  🤖 {activeNode.meta.agentConfig.role}
+                </span>
+              )}
+              {activeNode.meta.contextConfig?.isGlobal && (
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                  ✓ Global
+                </span>
+              )}
+              {activeNode.children.length > 0 && (
+                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">
+                  📁 {activeNode.children.length} enfant(s)
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      {/* Évaluation */}
-      {assessmentConfig.enabled && (
+      {/* Évaluation - uniquement si nœud spécifique */}
+      {assessmentConfig.enabled && activeNode && (
         <div className="border-b border-gray-200 bg-white/80 backdrop-blur p-3 flex-shrink-0">
           <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
             <span className="font-semibold text-gray-700">Évaluation de complétude</span>
@@ -329,7 +383,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
           </div>
           
           {/* Notes héritées des enfants */}
-          {hasChildren && (inheritedCompleteness !== undefined || inheritedQuestion !== undefined) && (
+          {hasChildren && activeNode && (inheritedCompleteness !== undefined || inheritedQuestion !== undefined) && (
             <div className="mb-3 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
               <div className="text-xs font-semibold text-blue-700 mb-2">📊 Notes héritées (moyenne des {activeNode.children.length} enfants)</div>
               <div className="flex gap-4">
@@ -345,7 +399,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
             </div>
           )}
           
-          {hasChildren && (
+          {hasChildren && activeNode && (
             <div className="text-xs font-semibold text-gray-600 mb-1">📝 Notes propres (ce nœud)</div>
           )}
           <div className="space-y-3">
@@ -393,9 +447,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
         </div>
       )}
 
-      {/* Toolbar */}
+      {/* Toolbar - désactivé partiellement pour H0 */}
       <div className="border-b border-gray-200 bg-gray-50 px-2 py-1.5 flex items-center gap-0.5 flex-wrap flex-shrink-0">
-        {toolbarButtons.map((btn, idx) =>
+        {!isDocRoot && toolbarButtons.map((btn, idx) =>
           btn.divider ? (
             <div key={idx} className="w-px h-6 bg-gray-300 mx-1.5" />
           ) : (
@@ -404,33 +458,44 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
               onClick={btn.action}
               className="toolbar-btn tooltip-wrapper"
               data-tooltip={btn.label}
+              disabled={!activeNode}
             >
               {btn.icon}
             </button>
           )
+        )}
+        
+        {isDocRoot && (
+          <span className="text-xs text-gray-500 italic px-2">
+            Vue document complet - sélectionnez un nœud pour éditer
+          </span>
         )}
 
         <div className="flex-1" />
 
         {/* View Mode Toggle */}
         <div className="flex items-center bg-gray-200 rounded-lg p-0.5">
-          <button
-            onClick={() => setViewMode('edit')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'edit' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Edit3 size={14} />
-            Éditer
-          </button>
-          <button
-            onClick={() => setViewMode('split')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'split' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Split
-          </button>
+          {!isDocRoot && (
+            <>
+              <button
+                onClick={() => setViewMode('edit')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'edit' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Edit3 size={14} />
+                Éditer
+              </button>
+              <button
+                onClick={() => setViewMode('split')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'split' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Split
+              </button>
+            </>
+          )}
           <button
             onClick={() => setViewMode('preview')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -445,8 +510,8 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
 
       {/* Éditeur de contenu */}
       <div className="flex-1 overflow-hidden flex min-h-0">
-        {/* Editor */}
-        {(viewMode === 'edit' || viewMode === 'split') && (
+        {/* Editor - uniquement si nœud spécifique sélectionné */}
+        {!isDocRoot && (viewMode === 'edit' || viewMode === 'split') && activeNode && (
           <div className={`${viewMode === 'split' ? 'w-1/2 border-r border-gray-200' : 'w-full'} flex flex-col overflow-hidden`}>
             <textarea
               ref={textareaRef}
@@ -464,15 +529,15 @@ Utilisez la barre d'outils pour formater votre texte :
           </div>
         )}
 
-        {/* Preview */}
-        {(viewMode === 'preview' || viewMode === 'split') && (
+        {/* Preview - affiche le contenu complet (nœud + enfants) */}
+        {(viewMode === 'preview' || viewMode === 'split' || isDocRoot) && (
           <div
             ref={previewRef}
-            className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} overflow-y-auto p-4 bg-white`}
+            className={`${!isDocRoot && viewMode === 'split' ? 'w-1/2' : 'w-full'} overflow-y-auto p-4 bg-white`}
           >
             <div
               className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: renderPreview(activeNode.content) }}
+              dangerouslySetInnerHTML={{ __html: renderPreview(fullContent) }}
             />
           </div>
         )}
@@ -480,9 +545,9 @@ Utilisez la barre d'outils pour formater votre texte :
 
       {/* Statistiques */}
       <div className="border-t border-gray-200 bg-gray-50 px-4 py-2 text-xs text-gray-600 flex justify-between">
-        <span>📝 {activeNode.content.length} caractères</span>
-        <span>📖 {activeNode.content.split(/\s+/).filter((w: string) => w).length} mots</span>
-        <span>📁 {activeNode.children.length} enfants</span>
+        <span>📝 {fullContent.length} caractères</span>
+        <span>📖 {fullContent.split(/\s+/).filter((w: string) => w).length} mots</span>
+        <span>📁 {isDocRoot ? tree.length + ' racine(s)' : (activeNode?.children.length || 0) + ' enfants'}</span>
       </div>
     </div>
   );

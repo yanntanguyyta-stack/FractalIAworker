@@ -33,10 +33,13 @@ interface HistorySnapshot {
 
 const MAX_HISTORY_SIZE = 50;
 
+// ID spécial pour le nœud H0 (document global)
+export const DOCUMENT_ROOT_ID = '__document_root__';
+
 interface EditorState {
   // Données
   tree: NodeData[];
-  activeNodeId: string | null;
+  activeNodeId: string | null;  // null ou DOCUMENT_ROOT_ID = vue document complet
   markdown: string;
   clipboardNode: NodeData | null;
   
@@ -51,7 +54,8 @@ interface EditorState {
   // Actions
   loadMarkdown: (markdown: string) => void;
   saveToMarkdown: () => string;
-  selectNode: (nodeId: string) => void;
+  selectNode: (nodeId: string | null) => void;  // null = sélectionner H0
+  selectDocumentRoot: () => void;  // Sélectionner le H0 (document complet)
   updateNodeContent: (nodeId: string, content: string) => void;
   updateNodeMeta: (nodeId: string, updates: Partial<NodeData['meta']>) => void;
   addChild: (parentId: string, heading: string) => void;
@@ -62,6 +66,8 @@ interface EditorState {
   getActiveNode: () => NodeData | null;
   getAllNodes: () => NodeData[];
   getNodePath: (nodeId: string) => NodeData[]; // Breadcrumb: chemin vers un nœud
+  getNodeFullContent: (nodeId: string | null) => string;  // Contenu d'un nœud + enfants
+  isDocumentRootSelected: () => boolean;
   
   // Actions Historique
   undo: () => void;
@@ -348,8 +354,8 @@ export const useStore = create<EditorState>()(
     const parsedTree = parseMarkdownToTree(markdown);
     const { assessmentConfig } = get();
     const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsedTree) : parsedTree;
-    const activeNodeId = tree.length > 0 ? tree[0].id : null;
-    set({ tree, markdown, activeNodeId, history: [], future: [] });
+    // Par défaut, sélectionner le document complet (H0)
+    set({ tree, markdown, activeNodeId: DOCUMENT_ROOT_ID, history: [], future: [] });
   },
 
   // Sauvegarder l'arbre en Markdown
@@ -360,9 +366,56 @@ export const useStore = create<EditorState>()(
     return markdown;
   },
 
-  // Sélectionner un nœud actif
-  selectNode: (nodeId: string) => {
-    set({ activeNodeId: nodeId });
+  // Sélectionner un nœud actif (ou DOCUMENT_ROOT_ID pour le document complet)
+  selectNode: (nodeId: string | null) => {
+    set({ activeNodeId: nodeId || DOCUMENT_ROOT_ID });
+  },
+
+  // Sélectionner le document complet (H0)
+  selectDocumentRoot: () => {
+    set({ activeNodeId: DOCUMENT_ROOT_ID });
+  },
+
+  // Vérifier si le document complet (H0) est sélectionné
+  isDocumentRootSelected: () => {
+    return get().activeNodeId === DOCUMENT_ROOT_ID;
+  },
+
+  // Obtenir le contenu complet d'un nœud et de tous ses enfants
+  getNodeFullContent: (nodeId: string | null) => {
+    const { tree } = get();
+    
+    // Fonction récursive pour construire le contenu avec la hiérarchie
+    function buildContent(nodes: NodeData[]): string {
+      let content = '';
+      for (const node of nodes) {
+        // Ajouter le titre avec le bon niveau de heading
+        const heading = '#'.repeat(node.headingDepth) + ' ' + node.heading;
+        content += heading + '\n\n';
+        
+        // Ajouter le contenu du nœud
+        if (node.content.trim()) {
+          content += node.content.trim() + '\n\n';
+        }
+        
+        // Ajouter récursivement le contenu des enfants
+        if (node.children.length > 0) {
+          content += buildContent(node.children);
+        }
+      }
+      return content;
+    }
+
+    // Si nodeId est null ou DOCUMENT_ROOT_ID, retourner tout le document
+    if (!nodeId || nodeId === DOCUMENT_ROOT_ID) {
+      return buildContent(tree);
+    }
+
+    // Sinon, trouver le nœud et retourner son contenu + enfants
+    const node = findNodeById(tree, nodeId);
+    if (!node) return '';
+    
+    return buildContent([node]);
   },
 
   // Mettre à jour le contenu d'un nœud

@@ -1,6 +1,6 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, ArrowUp, ArrowDown } from 'lucide-react';
-import { useStore } from '../store';
+import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, ArrowUp, ArrowDown, FileText } from 'lucide-react';
+import { useStore, DOCUMENT_ROOT_ID } from '../store';
 import { NodeData } from '../types';
 
 interface SidebarProps {
@@ -100,7 +100,8 @@ function highlightMatch(text: string, term: string) {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
-  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode, demoteNode } = useStore();
+  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode, demoteNode, selectDocumentRoot } = useStore();
+  const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = React.useState('');
   const [draggedNodeId, setDraggedNodeId] = React.useState<string | null>(null);
@@ -511,6 +512,29 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
           }
         }}
       >
+        {/* Nœud H0 - Document complet */}
+        <div className="p-2 border-b border-gray-200">
+          <div
+            className={`flex items-center gap-2 px-3 py-2 cursor-pointer rounded-lg transition-all duration-150 ${
+              isDocumentRoot
+                ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-l-4 border-indigo-500 shadow-sm'
+                : 'hover:bg-gray-100 border-l-4 border-transparent'
+            }`}
+            onClick={() => selectDocumentRoot()}
+          >
+            <FileText size={16} className={isDocumentRoot ? 'text-indigo-600' : 'text-gray-500'} />
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isDocumentRoot ? 'bg-indigo-200 text-indigo-700' : 'bg-gray-200 text-gray-600'}`}>
+              H0
+            </span>
+            <span className={`flex-1 text-sm font-semibold ${isDocumentRoot ? 'text-indigo-900' : 'text-gray-700'}`}>
+              Document complet
+            </span>
+            <span className="text-[10px] text-gray-400">
+              ({tree.length} racine{tree.length > 1 ? 's' : ''})
+            </span>
+          </div>
+        </div>
+
         {visibleTree.length === 0 ? (
           <div className="p-4 text-sm text-gray-500">
             {searchTerm ? 'Aucun résultat pour cette recherche.' : 'Aucun nœud. Chargez un Markdown pour commencer.'}
