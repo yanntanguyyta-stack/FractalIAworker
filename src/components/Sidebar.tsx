@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useStore } from '../store';
 import { NodeData } from '../types';
 
@@ -100,7 +100,7 @@ function highlightMatch(text: string, term: string) {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
-  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode } = useStore();
+  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode, demoteNode } = useStore();
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = React.useState('');
   const [draggedNodeId, setDraggedNodeId] = React.useState<string | null>(null);
@@ -304,6 +304,38 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               <Copy size={12} className="text-blue-600" />
             </button>
 
+            {/* Boutons Promouvoir/Rétrograder */}
+            {node.headingDepth > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const withChildren = e.shiftKey || confirm(`Promouvoir "${node.heading}" de H${node.headingDepth} à H${node.headingDepth - 1}.\n\nInclure les enfants ? (Annuler = non)`);
+                  promoteNode(node.id, withChildren);
+                }}
+                className="p-1 hover:bg-amber-200 rounded node-action tooltip-wrapper flex-shrink-0"
+                data-tooltip="Promouvoir (Shift = avec enfants)"
+              >
+                <ArrowUp size={12} className="text-amber-600" />
+              </button>
+            )}
+
+            {node.headingDepth < 6 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const withChildren = e.shiftKey || confirm(`Rétrograder "${node.heading}" de H${node.headingDepth} à H${node.headingDepth + 1}.\n\nInclure les enfants ? (Annuler = non)`);
+                  const success = demoteNode(node.id, withChildren);
+                  if (!success) {
+                    alert('Impossible de rétrograder : profondeur maximale atteinte.');
+                  }
+                }}
+                className="p-1 hover:bg-orange-200 rounded node-action tooltip-wrapper flex-shrink-0"
+                data-tooltip="Rétrograder (Shift = avec enfants)"
+              >
+                <ArrowDown size={12} className="text-orange-600" />
+              </button>
+            )}
+
             {clipboardNode && (
               <button
                 onClick={(e) => {
@@ -348,8 +380,10 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const handleAddRootNode = () => {
     const title = prompt('Créer un nouveau nœud racine (H1) :\n\nTitre du nœud :');
     if (title && title.trim()) {
-      // On utilise addChild avec un parent null en passant par le store directement
-      // Pour l'instant, on crée un nœud à la racine via le store
+      // Sauvegarder l'état avant modification (via _pushHistory interne)
+      const state = useStore.getState() as any;
+      if (state._pushHistory) state._pushHistory();
+      
       const { tree } = useStore.getState();
       const newNode = {
         id: Date.now().toString(36) + Math.random().toString(36).substr(2),
@@ -366,6 +400,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     }
   };
 
+  const historyCanUndo = canUndo();
+  const historyCanRedo = canRedo();
+
   return (
     <div
       className={`bg-white flex flex-col h-full ${className}`}
@@ -377,6 +414,24 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             Structure
           </h2>
           <div className="flex gap-1">
+            {/* Boutons Undo/Redo */}
+            <button 
+              onClick={undo}
+              disabled={!historyCanUndo}
+              className={`text-xs px-2 py-1 rounded transition-colors ${historyCanUndo ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
+              title="Annuler (Ctrl+Z)"
+            >
+              <Undo2 size={14} />
+            </button>
+            <button 
+              onClick={redo}
+              disabled={!historyCanRedo}
+              className={`text-xs px-2 py-1 rounded transition-colors ${historyCanRedo ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
+              title="Rétablir (Ctrl+Y)"
+            >
+              <Redo2 size={14} />
+            </button>
+            <span className="w-px bg-gray-300 mx-1"></span>
             <button 
               onClick={handleAddRootNode}
               className="text-xs px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors font-medium"

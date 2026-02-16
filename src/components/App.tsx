@@ -18,7 +18,7 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ className = '' }) => {
-  const { loadMarkdown, tree, saveToMarkdown, aiConfig } = useStore();
+  const { loadMarkdown, tree, saveToMarkdown, aiConfig, undo, redo, canUndo, canRedo } = useStore();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newDocWizardOpen, setNewDocWizardOpen] = useState(false);
@@ -98,6 +98,32 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [handleMouseMove, handleMouseUp]);
+
+  // Raccourcis clavier Ctrl+Z (Undo) et Ctrl+Y/Ctrl+Shift+Z (Redo)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorer si on est dans un champ de saisie
+      const target = e.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        // Ctrl+Z ou Cmd+Z pour Undo
+        if (!isInputField && canUndo()) {
+          e.preventDefault();
+          undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        // Ctrl+Y ou Ctrl+Shift+Z ou Cmd+Shift+Z pour Redo
+        if (!isInputField && canRedo()) {
+          e.preventDefault();
+          redo();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, canUndo, canRedo]);
 
   useEffect(() => {
     if (!showExportMenu) return;

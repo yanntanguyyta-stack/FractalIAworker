@@ -25,12 +25,24 @@ export interface AssessmentConfig {
   question: string;
 }
 
+// Historique pour undo/redo
+interface HistorySnapshot {
+  tree: NodeData[];
+  activeNodeId: string | null;
+}
+
+const MAX_HISTORY_SIZE = 50;
+
 interface EditorState {
   // Données
   tree: NodeData[];
   activeNodeId: string | null;
   markdown: string;
   clipboardNode: NodeData | null;
+  
+  // Historique
+  history: HistorySnapshot[];
+  future: HistorySnapshot[];
   
   // Configuration IA
   aiConfig: AIConfig;
@@ -50,6 +62,16 @@ interface EditorState {
   getActiveNode: () => NodeData | null;
   getAllNodes: () => NodeData[];
   getNodePath: (nodeId: string) => NodeData[]; // Breadcrumb: chemin vers un nœud
+  
+  // Actions Historique
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  
+  // Actions de niveau de nœud
+  promoteNode: (nodeId: string, withChildren: boolean) => boolean;
+  demoteNode: (nodeId: string, withChildren: boolean) => boolean;
   
   // Actions IA
   setAIConfig: (config: AIConfig) => void;
@@ -186,8 +208,140 @@ export const useStore = create<EditorState>()(
       activeNodeId: null,
       markdown: '',
       clipboardNode: null,
+      history: [],
+      future: [],
       aiConfig: defaultAIConfig,
       assessmentConfig: defaultAssessmentConfig,
+
+  // Helper interne pour sauvegarder l'état dans l'historique
+  _pushHistory: () => {
+    const { tree, activeNodeId, history } = get();
+    const snapshot: HistorySnapshot = {
+      tree: JSON.parse(JSON.stringify(tree)),
+      activeNodeId,
+    };
+    const newHistory = [...history, snapshot].slice(-MAX_HISTORY_SIZE);
+    set({ history: newHistory, future: [] });
+  },
+
+  // Undo - restaurer l'état précédent
+  undo: () => {
+    const { tree, activeNodeId, history, future } = get();
+    if (history.length === 0) return;
+    
+    const currentSnapshot: HistorySnapshot = {
+      tree: JSON.parse(JSON.stringify(tree)),
+      activeNodeId,
+    };
+    
+    const previousSnapshot = history[history.length - 1];
+    const newHistory = history.slice(0, -1);
+    const newFuture = [currentSnapshot, ...future];
+    
+    set({
+      tree: previousSnapshot.tree,
+      activeNodeId: previousSnapshot.activeNodeId,
+      history: newHistory,
+      future: newFuture,
+    });
+  },
+
+  // Redo - restaurer l'état suivant
+  redo: () => {
+    const { tree, activeNodeId, history, future } = get();
+    if (future.length === 0) return;
+    
+    const currentSnapshot: HistorySnapshot = {
+      tree: JSON.parse(JSON.stringify(tree)),
+      activeNodeId,
+    };
+    
+    const nextSnapshot = future[0];
+    const newFuture = future.slice(1);
+    const newHistory = [...history, currentSnapshot];
+    
+    set({
+      tree: nextSnapshot.tree,
+      activeNodeId: nextSnapshot.activeNodeId,
+      history: newHistory,
+      future: newFuture,
+    });
+  },
+
+  canUndo: () => get().history.length > 0,
+  canRedo: () => get().future.length > 0,
+
+  // Promouvoir un nœud (H2 → H1, etc.)
+  promoteNode: (nodeId: string, withChildren: boolean) => {
+    const { tree } = get();
+    const node = findNodeById(tree, nodeId);
+    if (!node || node.headingDepth <= 1) return false;
+    
+    // Sauvegarder l'état avant modification
+    (get() as any)._pushHistory();
+    
+    function updateDepth(nodes: NodeData[]): NodeData[] {
+      return nodes.map(n => {
+        if (n.id === nodeId) {
+          if (withChildren) {
+            // Promouvoir le nœud et tous ses enfants
+            return adjustNodeDepth(n, -1);
+          } else {
+            // Promouvoir uniquement le nœud
+            return { ...n, headingDepth: n.headingDepth - 1 };
+          }
+        }
+        if (n.children.length > 0) {
+          return { ...n, children: updateDepth(n.children) };
+        }
+        return n;
+      });
+    }
+    
+    const updated = updateDepth(tree);
+    set({ tree: updated });
+    return true;
+  },
+
+  // Rétrograder un nœud (H1 → H2, etc.)
+  demoteNode: (nodeId: string, withChildren: boolean) => {
+    const { tree } = get();
+    const node = findNodeById(tree, nodeId);
+    if (!node) return false;
+    
+    // Vérifier la profondeur maximale
+    const maxDepth = getSubtreeMaxDepth(node);
+    const depthIncrease = withChildren ? 1 : 0;
+    if (node.headingDepth + 1 > MAX_HEADING_DEPTH || 
+        (withChildren && maxDepth + 1 > MAX_HEADING_DEPTH)) {
+      return false;
+    }
+    
+    // Sauvegarder l'état avant modification
+    (get() as any)._pushHistory();
+    
+    function updateDepth(nodes: NodeData[]): NodeData[] {
+      return nodes.map(n => {
+        if (n.id === nodeId) {
+          if (withChildren) {
+            // Rétrograder le nœud et tous ses enfants
+            return adjustNodeDepth(n, 1);
+          } else {
+            // Rétrograder uniquement le nœud
+            return { ...n, headingDepth: n.headingDepth + 1 };
+          }
+        }
+        if (n.children.length > 0) {
+          return { ...n, children: updateDepth(n.children) };
+        }
+        return n;
+      });
+    }
+    
+    const updated = updateDepth(tree);
+    set({ tree: updated });
+    return true;
+  },
 
   // Charger le Markdown et parser l'arbre
   loadMarkdown: (markdown: string) => {
@@ -195,7 +349,7 @@ export const useStore = create<EditorState>()(
     const { assessmentConfig } = get();
     const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsedTree) : parsedTree;
     const activeNodeId = tree.length > 0 ? tree[0].id : null;
-    set({ tree, markdown, activeNodeId });
+    set({ tree, markdown, activeNodeId, history: [], future: [] });
   },
 
   // Sauvegarder l'arbre en Markdown
@@ -214,6 +368,8 @@ export const useStore = create<EditorState>()(
   // Mettre à jour le contenu d'un nœud
   updateNodeContent: (nodeId: string, content: string) => {
     const { tree } = get();
+    // Sauvegarder l'état avant modification
+    (get() as any)._pushHistory();
     const updated = updateNodeInTree(tree, nodeId, { content });
     set({ tree: updated });
   },
@@ -234,6 +390,8 @@ export const useStore = create<EditorState>()(
     const { tree } = get();
     const parent = findNodeById(tree, parentId);
     if (parent) {
+      // Sauvegarder l'état avant modification
+      (get() as any)._pushHistory();
       const { assessmentConfig } = get();
       const newNode: NodeData = {
         id: generateId(),
@@ -257,6 +415,9 @@ export const useStore = create<EditorState>()(
   // Supprimer un nœud
   deleteNode: (nodeId: string) => {
     const { tree, activeNodeId } = get();
+    
+    // Sauvegarder l'état avant modification
+    (get() as any)._pushHistory();
     
     function removeNode(nodes: NodeData[]): NodeData[] {
       return nodes
@@ -294,6 +455,8 @@ export const useStore = create<EditorState>()(
     if (newDepth < 1 || newDepth + (maxDepth - clipboardNode.headingDepth) > MAX_HEADING_DEPTH) {
       return false;
     }
+    // Sauvegarder l'état avant modification
+    (get() as any)._pushHistory();
     const clonedNode = cloneNodeWithNewIds(clipboardNode, depthDelta);
     const updated = insertNode(tree, targetId, clonedNode);
     set({ tree: updated });
@@ -315,6 +478,8 @@ export const useStore = create<EditorState>()(
     if (newDepth < 1 || newDepth + (maxDepth - node.headingDepth) > MAX_HEADING_DEPTH) {
       return false;
     }
+    // Sauvegarder l'état avant modification
+    (get() as any)._pushHistory();
     const depthDelta = newDepth - node.headingDepth;
     const adjustedNode = adjustNodeDepth(node, depthDelta);
     const removedResult = removeNodeById(tree, nodeId);
