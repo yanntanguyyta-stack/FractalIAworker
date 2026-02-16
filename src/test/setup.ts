@@ -1,4 +1,5 @@
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
+import { vi, beforeEach } from 'vitest';
 
 // Mock global pour les tests
 global.ResizeObserver = class ResizeObserver {

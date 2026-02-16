@@ -7,6 +7,7 @@ import ChatPane from './ChatPane';
 import SettingsModal from './SettingsModal';
 import NewDocumentWizard from './NewDocumentWizard';
 import OnboardingWizard from './OnboardingWizard';
+import ImportWizard from './ImportWizard';
 import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle } from 'lucide-react';
 import { buildHtmlDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
 
@@ -28,6 +29,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
   });
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
 
   const handleCloseOnboarding = useCallback(() => {
     setOnboardingOpen(false);
@@ -260,9 +262,9 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
             </button>
 
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setImportWizardOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
-              title="Importer un fichier (Markdown, PDF, DOCX)"
+              title="Importer un fichier avec analyse de structure"
             >
               <Upload size={18} />
               Importer
@@ -452,6 +454,12 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
         isOpen={onboardingOpen} 
         onClose={handleCloseOnboarding}
         onOpenSettings={() => setSettingsOpen(true)}
+      />
+
+      {/* Wizard Import avec analyse de structure */}
+      <ImportWizard 
+        isOpen={importWizardOpen} 
+        onClose={() => setImportWizardOpen(false)}
       />
     </div>
   );

@@ -350,6 +350,7 @@ describe('aiService', () => {
         provider: 'gemini',
         apiKey: '',
         model: 'gemini-pro',
+        chatMode: 'discussion',
       };
 
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(
@@ -377,6 +378,7 @@ describe('aiService', () => {
         provider: 'gemini',
         apiKey: 'test-key',
         model: 'gemini-pro',
+        chatMode: 'discussion',
       };
 
       const result = await callAIAPI('system prompt', 'user message', config);
@@ -406,6 +408,7 @@ describe('aiService', () => {
         provider: 'openai',
         apiKey: 'test-key',
         model: 'gpt-4',
+        chatMode: 'discussion',
       };
 
       const result = await callAIAPI('system prompt', 'user message', config);
@@ -428,6 +431,7 @@ describe('aiService', () => {
         provider: 'gemini',
         apiKey: 'invalid-key',
         model: 'gemini-pro',
+        chatMode: 'discussion',
       };
 
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(
@@ -446,6 +450,7 @@ describe('aiService', () => {
         provider: 'openai',
         apiKey: 'invalid-key',
         model: 'gpt-4',
+        chatMode: 'discussion',
       };
 
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(
@@ -463,6 +468,7 @@ describe('aiService', () => {
         provider: 'gemini',
         apiKey: 'test-key',
         model: 'gemini-pro',
+        chatMode: 'discussion',
       };
 
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(
@@ -480,6 +486,7 @@ describe('aiService', () => {
         provider: 'openai',
         apiKey: 'test-key',
         model: 'gpt-4',
+        chatMode: 'discussion',
       };
 
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(
@@ -507,6 +514,7 @@ describe('aiService', () => {
         provider: 'gemini',
         apiKey: 'test-key',
         model: 'gemini-3-pro-preview',
+        chatMode: 'discussion',
       };
 
       await callAIAPI('system', 'user', config);
@@ -530,6 +538,7 @@ describe('aiService', () => {
         provider: 'openai',
         apiKey: 'test-key',
         model: 'gpt-4',
+        chatMode: 'discussion',
       };
 
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(

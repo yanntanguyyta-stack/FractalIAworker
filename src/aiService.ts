@@ -10,6 +10,95 @@ import { AIConfig, AIProvider, ChatMode } from './store';
  * Couche 4 (Tâche): Contenu du nœud actif
  */
 
+/**
+ * Structure d'une réponse IA parsée avec sections distinctes
+ */
+export interface ParsedAIResponse {
+  discussion: string;        // 📣 Commentaires de l'IA
+  content: string;          // 📝 Contenu à intégrer
+  subsections: SubsectionProposal[];  // 🏗️ Sous-sections proposées
+  raw: string;              // Réponse brute (fallback)
+}
+
+export interface SubsectionProposal {
+  title: string;
+  description: string;
+  level: number;  // Niveau de heading (3, 4, 5, 6)
+}
+
+/**
+ * Parser une réponse IA structurée
+ */
+export function parseAIResponse(response: string): ParsedAIResponse {
+  const result: ParsedAIResponse = {
+    discussion: '',
+    content: '',
+    subsections: [],
+    raw: response,
+  };
+
+  // Patterns pour détecter les sections
+  const discussionPattern = /📣\s*DISCUSSION\s*\n([\s\S]*?)(?=📝\s*CONTENU|🏗️\s*SOUS-SECTIONS|$)/i;
+  const contentPattern = /📝\s*CONTENU\s*\n([\s\S]*?)(?=🏗️\s*SOUS-SECTIONS|$)/i;
+  const subsectionsPattern = /🏗️\s*SOUS-SECTIONS\s*\n([\s\S]*?)$/i;
+
+  // Extraire la section DISCUSSION
+  const discussionMatch = response.match(discussionPattern);
+  if (discussionMatch) {
+    result.discussion = discussionMatch[1].trim();
+  }
+
+  // Extraire la section CONTENU
+  const contentMatch = response.match(contentPattern);
+  if (contentMatch) {
+    result.content = contentMatch[1].trim();
+  }
+
+  // Extraire la section SOUS-SECTIONS
+  const subsectionsMatch = response.match(subsectionsPattern);
+  if (subsectionsMatch) {
+    const subsectionsText = subsectionsMatch[1].trim();
+    
+    // Parser les sous-sections (format: ### Titre\nDescription)
+    const headingPattern = /^(#{2,6})\s+(.+)$/gm;
+    let match;
+    const headings: { level: number; title: string; startIndex: number }[] = [];
+    
+    while ((match = headingPattern.exec(subsectionsText)) !== null) {
+      headings.push({
+        level: match[1].length,
+        title: match[2].trim(),
+        startIndex: match.index + match[0].length,
+      });
+    }
+
+    // Extraire le contenu de chaque sous-section
+    for (let i = 0; i < headings.length; i++) {
+      const heading = headings[i];
+      const nextStart = i + 1 < headings.length 
+        ? subsectionsText.lastIndexOf('#', headings[i + 1].startIndex - 1)
+        : subsectionsText.length;
+      
+      const description = subsectionsText
+        .substring(heading.startIndex, nextStart)
+        .trim();
+      
+      result.subsections.push({
+        title: heading.title,
+        description: description,
+        level: heading.level,
+      });
+    }
+  }
+
+  // Si aucune section n'a été détectée, mettre tout dans discussion (fallback)
+  if (!result.discussion && !result.content && result.subsections.length === 0) {
+    result.discussion = response;
+  }
+
+  return result;
+}
+
 export interface AIContextSandwich {
   globalContext: string;
   hierarchicalContext: string; // Nouveau: contexte des ancêtres
@@ -141,35 +230,62 @@ function findNodeById(nodes: NodeData[], nodeId: string): NodeData | null {
 export function buildSystemPrompt(context: AIContextSandwich, chatMode: ChatMode = 'discussion'): string {
   let prompt = '';
 
+  // Format de réponse structuré - COMMUN AUX DEUX MODES
+  prompt += `## FORMAT DE RÉPONSE OBLIGATOIRE
+
+Tu DOIS structurer TOUTES tes réponses en utilisant ces marqueurs de section :
+
+**📣 DISCUSSION**
+Tes commentaires, analyses, explications. Cette partie est conversationnelle et ne sera PAS intégrée au document.
+
+**📝 CONTENU**
+Le contenu Markdown à intégrer dans le nœud actuel. Cette section sera proposée pour intégration directe.
+(Laisse cette section vide si tu n'as pas de contenu à proposer.)
+
+**🏗️ SOUS-SECTIONS**
+Les sous-sections/sous-thèmes proposés. Utilise des titres Markdown du niveau approprié.
+Chaque sous-section doit avoir un titre et une brève description.
+(Laisse cette section vide si tu ne proposes pas de sous-sections.)
+
+EXEMPLE DE RÉPONSE :
+---
+📣 DISCUSSION
+Voici mon analyse de votre demande...
+
+📝 CONTENU
+Voici le texte que je propose d'intégrer dans votre section :
+- Point 1
+- Point 2
+
+🏗️ SOUS-SECTIONS
+### Nom de la sous-section 1
+Description de ce que cette section doit contenir.
+
+### Nom de la sous-section 2
+Description...
+---
+
+`;
+
   // Instructions de mode en premier
   if (chatMode === 'structuration') {
-    prompt += `## INSTRUCTIONS DE STRUCTURATION (MODE CHEF DE PROJET ACTIF)
+    prompt += `## MODE STRUCTURATION (CHEF DE PROJET)
 Tu es en MODE STRUCTURATION. Tu agis comme un **chef de projet** qui organise et structure le travail.
 
-TON RÔLE :
-- Analyser le contenu et identifier les sous-thèmes ou sous-tâches
-- Proposer une décomposition logique en sous-sections
-- Évaluer la complétude de la structure actuelle
-- Suggérer les parties manquantes
+PRIORITÉS :
+1. Analyser le contenu et identifier les sous-thèmes ou sous-tâches
+2. Proposer une décomposition logique en sous-sections (section 🏗️ SOUS-SECTIONS obligatoire)
+3. Évaluer la complétude de la structure actuelle
+4. Suggérer les parties manquantes
 
-RÈGLES STRICTES :
-- Propose TOUJOURS des sous-sections avec des titres Markdown du bon niveau
-- Utilise le format de titre approprié (### pour niveau 3, #### pour niveau 4, etc.)
-- Structure ta réponse de façon claire et actionable
-- Identifie ce qui manque pour être complet
-
-FORMAT DE RÉPONSE :
-Quand tu proposes des sous-sections, utilise ce format :
-### Sous-section 1
-Brève description de ce que cette section doit contenir.
-
-### Sous-section 2
-Brève description...
+En mode structuration, la section 🏗️ SOUS-SECTIONS doit être substantielle.
 
 `;
   } else {
     prompt += `## MODE DISCUSSION
 Tu es en mode discussion. Tu peux être conversationnel et explicatif.
+La section 📣 DISCUSSION peut être plus développée.
+Les sections 📝 CONTENU et 🏗️ SOUS-SECTIONS sont optionnelles selon le contexte.
 
 `;
   }
@@ -216,30 +332,20 @@ Le nœud actif est le dernier de cette hiérarchie. Garde ce contexte parent en 
   const childDepth = currentDepth + 1;
   const childHeadingPrefix = '#'.repeat(childDepth);
 
-  prompt += `## STRUCTURE HIÉRARCHIQUE ET CRÉATION DE SOUS-SECTIONS
+  prompt += `## STRUCTURE HIÉRARCHIQUE
 Tu travailles sur un nœud de niveau ${currentDepth} (profondeur de titre: ${'#'.repeat(currentDepth)}).
+Les sous-sections de ce nœud seront de niveau ${childDepth} (${childHeadingPrefix}).
 
-**IMPORTANT - Propose des sous-sections quand c'est pertinent !**
+**Dans la section 🏗️ SOUS-SECTIONS, utilise TOUJOURS des titres de niveau ${childDepth}** :
+${childHeadingPrefix} Nom de la sous-section
+Description de ce que cette section doit contenir.
 
-Si le sujet abordé est complexe ou mérite d'être décomposé, tu DOIS suggérer la création de sous-nœuds enfants.
-
-Pour proposer des sous-sections, utilise des titres Markdown de niveau ${childDepth} :
-\`\`\`
-${childHeadingPrefix} Nom de la sous-section 1
-Contenu...
-
-${childHeadingPrefix} Nom de la sous-section 2
-Contenu...
-\`\`\`
-
-**Quand proposer des sous-nœuds :**
+**Quand proposer des sous-sections :**
 - Le sujet peut être décomposé en parties distinctes
 - Plusieurs aspects différents doivent être traités
 - Une structure arborescente améliorerait la clarté
 - L'utilisateur demande un développement détaillé
-
-**Format de suggestion :**
-Tu peux dire : "Je te propose de structurer ce nœud avec les sous-sections suivantes :" puis lister les titres de niveau ${childDepth}.
+- Le nœud actuel est vide et mérite une structure
 
 `;
 

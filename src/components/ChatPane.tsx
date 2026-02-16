@@ -1,12 +1,13 @@
 import React from 'react';
-import { Send, Copy, Check, Settings, MessageSquare, FileText, Zap, ChevronDown } from 'lucide-react';
+import { Send, Copy, Check, Settings, MessageSquare, FileText, Zap, ChevronDown, Plus, ChevronRight } from 'lucide-react';
 import { useStore, ChatMode } from '../store';
-import { buildContextSandwich, buildSystemPrompt, buildUserMessage, callAIAPI } from '../aiService';
+import { buildContextSandwich, buildSystemPrompt, buildUserMessage, callAIAPI, parseAIResponse, ParsedAIResponse, SubsectionProposal } from '../aiService';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  parsed?: ParsedAIResponse; // Réponse parsée pour les messages assistant
 }
 
 interface ChatPaneProps {
@@ -39,13 +40,31 @@ const promptTemplates = [
 ];
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
-  const { getActiveNode, getAllNodes, updateNodeContent, aiConfig, setChatMode, setAIConfig } = useStore();
+  const { getActiveNode, getAllNodes, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild } = useStore();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState<number | null>(null);
   const [showTemplates, setShowTemplates] = React.useState(false);
+  const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(['discussion', 'content', 'subsections']));
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  const toggleSection = (messageIdx: number, section: string) => {
+    const key = `${messageIdx}-${section}`;
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
+  const isSectionExpanded = (messageIdx: number, section: string) => {
+    return expandedSections.has(`${messageIdx}-${section}`) || expandedSections.has(section);
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -91,11 +110,15 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
       // Appeler l'IA avec la configuration
       const aiResponse = await callAIAPI(systemPrompt, messageForAI, aiConfig);
 
-      // Ajouter la réponse de l'IA
+      // Parser la réponse structurée
+      const parsedResponse = parseAIResponse(aiResponse);
+
+      // Ajouter la réponse de l'IA avec parsing
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: aiResponse,
         timestamp: new Date(),
+        parsed: parsedResponse,
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
@@ -250,59 +273,176 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
             key={idx}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div
-              className={`max-w-[85%] p-3 rounded-lg ${
-                msg.role === 'user'
-                  ? 'bg-blue-500 text-white rounded-br-none'
-                  : 'bg-gray-100 text-gray-900 rounded-bl-none'
-              }`}
-            >
-              <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-              <p className="text-xs mt-1 opacity-70">
-                {msg.timestamp.toLocaleTimeString()}
-              </p>
+            {msg.role === 'user' ? (
+              // Message utilisateur (inchangé)
+              <div className="max-w-[85%] p-3 rounded-lg bg-blue-500 text-white rounded-br-none">
+                <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                <p className="text-xs mt-1 opacity-70">
+                  {msg.timestamp.toLocaleTimeString()}
+                </p>
+              </div>
+            ) : (
+              // Message assistant - affichage structuré
+              <div className="max-w-[90%] space-y-2">
+                {/* Vérifier si on a une réponse parsée avec des sections */}
+                {msg.parsed && (msg.parsed.discussion || msg.parsed.content || msg.parsed.subsections.length > 0) ? (
+                  <>
+                    {/* Section DISCUSSION */}
+                    {msg.parsed.discussion && (
+                      <div className="bg-slate-100 rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => toggleSection(idx, 'discussion')}
+                          className="w-full flex items-center gap-2 p-2 bg-slate-200 hover:bg-slate-300 transition-colors"
+                        >
+                          <ChevronRight 
+                            size={14} 
+                            className={`transition-transform ${isSectionExpanded(idx, 'discussion') ? 'rotate-90' : ''}`} 
+                          />
+                          <span className="text-sm font-medium text-slate-700">📣 Discussion</span>
+                        </button>
+                        {isSectionExpanded(idx, 'discussion') && (
+                          <div className="p-3">
+                            <p className="text-sm whitespace-pre-wrap break-words text-gray-700">{msg.parsed.discussion}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-              {msg.role === 'assistant' && (
-                <div className="flex flex-wrap gap-2 mt-3">
+                    {/* Section CONTENU */}
+                    {msg.parsed.content && (
+                      <div className="bg-green-50 rounded-lg overflow-hidden border border-green-200">
+                        <button
+                          onClick={() => toggleSection(idx, 'content')}
+                          className="w-full flex items-center gap-2 p-2 bg-green-100 hover:bg-green-200 transition-colors"
+                        >
+                          <ChevronRight 
+                            size={14} 
+                            className={`transition-transform ${isSectionExpanded(idx, 'content') ? 'rotate-90' : ''}`} 
+                          />
+                          <span className="text-sm font-medium text-green-700">📝 Contenu à intégrer</span>
+                        </button>
+                        {isSectionExpanded(idx, 'content') && (
+                          <div className="p-3">
+                            <p className="text-sm whitespace-pre-wrap break-words text-gray-800 mb-3">{msg.parsed.content}</p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleCommit(msg.parsed!.content, false)}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded bg-green-500 hover:bg-green-600 text-white text-xs font-medium transition-colors"
+                              >
+                                <Plus size={12} />
+                                Ajouter au nœud
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm('Remplacer tout le contenu du nœud ?')) {
+                                    handleCommit(msg.parsed!.content, true);
+                                  }
+                                }}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors"
+                              >
+                                ↻ Remplacer
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Section SOUS-SECTIONS */}
+                    {msg.parsed.subsections.length > 0 && (
+                      <div className="bg-purple-50 rounded-lg overflow-hidden border border-purple-200">
+                        <button
+                          onClick={() => toggleSection(idx, 'subsections')}
+                          className="w-full flex items-center gap-2 p-2 bg-purple-100 hover:bg-purple-200 transition-colors"
+                        >
+                          <ChevronRight 
+                            size={14} 
+                            className={`transition-transform ${isSectionExpanded(idx, 'subsections') ? 'rotate-90' : ''}`} 
+                          />
+                          <span className="text-sm font-medium text-purple-700">
+                            🏗️ Sous-sections proposées ({msg.parsed.subsections.length})
+                          </span>
+                        </button>
+                        {isSectionExpanded(idx, 'subsections') && (
+                          <div className="p-3 space-y-2">
+                            {msg.parsed.subsections.map((sub, subIdx) => (
+                              <div key={subIdx} className="flex items-start gap-2 p-2 bg-white rounded border border-purple-100">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">
+                                      H{sub.level}
+                                    </span>
+                                    <span className="font-medium text-sm text-gray-800 truncate">{sub.title}</span>
+                                  </div>
+                                  {sub.description && (
+                                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">{sub.description}</p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    addChild(activeNode.id, sub.title);
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1 rounded bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors whitespace-nowrap"
+                                  title="Créer ce nœud enfant"
+                                >
+                                  <Plus size={12} />
+                                  Créer
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              onClick={() => {
+                                if (confirm(`Créer les ${msg.parsed!.subsections.length} sous-sections ?`)) {
+                                  msg.parsed!.subsections.forEach(sub => {
+                                    addChild(activeNode.id, sub.title);
+                                  });
+                                }
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
+                            >
+                              <Plus size={14} />
+                              Créer toutes les sous-sections
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Fallback: affichage classique si pas de parsing
+                  <div className="bg-gray-100 text-gray-900 rounded-lg rounded-bl-none p-3">
+                    <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button
+                        onClick={() => handleCopy(idx, msg.content)}
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-white/50 hover:bg-white text-xs text-gray-700 transition-colors"
+                      >
+                        {copiedId === idx ? <><Check size={12} /> Copié</> : <><Copy size={12} /> Copier</>}
+                      </button>
+                      <button
+                        onClick={() => handleCommit(msg.content, false)}
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-xs transition-colors"
+                      >
+                        + Ajouter
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Timestamp et actions globales */}
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-xs text-gray-400">
+                    {msg.timestamp.toLocaleTimeString()}
+                  </p>
                   <button
                     onClick={() => handleCopy(idx, msg.content)}
-                    className="flex items-center gap-1 px-2 py-1 rounded bg-white/50 hover:bg-white text-xs text-gray-700 transition-colors"
+                    className="text-xs text-gray-500 hover:text-gray-700"
                   >
-                    {copiedId === idx ? (
-                      <>
-                        <Check size={12} />
-                        Copié
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={12} />
-                        Copier
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => handleCommit(msg.content, false)}
-                    className="flex items-center gap-1 px-2 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-xs transition-colors"
-                    title="Ajouter à la fin du contenu"
-                  >
-                    + Ajouter
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      if (confirm('Remplacer tout le contenu de la section par cette réponse ?')) {
-                        handleCommit(msg.content, true);
-                      }
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs transition-colors"
-                    title="Remplacer le contenu"
-                  >
-                    ↻ Remplacer
+                    {copiedId === idx ? '✓ Copié' : 'Copier tout'}
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ))}
 

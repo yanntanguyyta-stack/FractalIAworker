@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EditorPane from '../components/EditorPane';
 import { useStore } from '../store';
+import type { NodeData } from '../types';
 
 // Mock mermaid
 vi.mock('mermaid', () => ({
@@ -214,7 +215,7 @@ Contenu 2`);
     
     // Mettre des scores aux enfants
     const parent = useStore.getState().tree[0];
-    parent.children.forEach(child => {
+    parent.children.forEach((child: NodeData) => {
       useStore.getState().updateNodeAssessment(child.id, { completenessScore: 8, questionScore: 7 });
     });
     
@@ -265,7 +266,7 @@ Contenu 2`);
     
     // Mettre des scores aux enfants
     const parent = useStore.getState().tree[0];
-    parent.children.forEach(child => {
+    parent.children.forEach((child: NodeData) => {
       useStore.getState().updateNodeAssessment(child.id, { completenessScore: 8, questionScore: 7 });
     });
     

@@ -595,7 +595,7 @@ describe('ChatPane', () => {
     
     // Les templates de structuration ont la classe bg-gray-50 et sont dans la première section
     // On trouve les boutons dans la section Structuration
-    const structurationSection = screen.getByText('🏗️ Structuration').nextSibling;
+    const structurationSection = screen.getByText('🏗️ Structuration').nextSibling as Element | null;
     if (structurationSection) {
       const structButtons = structurationSection.querySelectorAll('button');
       if (structButtons.length > 0) {

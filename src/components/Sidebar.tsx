@@ -268,16 +268,30 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               </span>
             )}
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                addChild(node.id, 'Nouveau nœud');
-              }}
-              className="p-1 hover:bg-green-200 rounded node-action tooltip-wrapper flex-shrink-0"
-              data-tooltip="Ajouter un enfant"
-            >
-              <Plus size={12} className="text-green-600" />
-            </button>
+            {/* Bouton Ajouter enfant - désactivé si niveau max atteint */}
+            {node.headingDepth < 6 ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const childLevel = node.headingDepth + 1;
+                  const title = prompt(`Créer un sous-nœud (H${childLevel}) sous "${node.heading}":\n\nTitre du nouveau nœud :`);
+                  if (title && title.trim()) {
+                    addChild(node.id, title.trim());
+                  }
+                }}
+                className="p-1 hover:bg-green-200 rounded node-action tooltip-wrapper flex-shrink-0"
+                data-tooltip={`Ajouter un H${node.headingDepth + 1}`}
+              >
+                <Plus size={12} className="text-green-600" />
+              </button>
+            ) : (
+              <span 
+                className="p-1 text-gray-300 cursor-not-allowed flex-shrink-0" 
+                title="Profondeur maximale atteinte (H6)"
+              >
+                <Plus size={12} />
+              </span>
+            )}
 
             <button
               onClick={(e) => {
@@ -330,6 +344,28 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const totalNodes = countAllNodes(tree);
   const maxDepth = getMaxDepth(tree);
 
+  // Fonction pour ajouter un nœud racine (H1)
+  const handleAddRootNode = () => {
+    const title = prompt('Créer un nouveau nœud racine (H1) :\n\nTitre du nœud :');
+    if (title && title.trim()) {
+      // On utilise addChild avec un parent null en passant par le store directement
+      // Pour l'instant, on crée un nœud à la racine via le store
+      const { tree } = useStore.getState();
+      const newNode = {
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+        heading: title.trim(),
+        headingDepth: 1,
+        content: '',
+        meta: {
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+          type: 'section' as const,
+        },
+        children: [],
+      };
+      useStore.setState({ tree: [...tree, newNode] });
+    }
+  };
+
   return (
     <div
       className={`bg-white flex flex-col h-full ${className}`}
@@ -341,6 +377,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             Structure
           </h2>
           <div className="flex gap-1">
+            <button 
+              onClick={handleAddRootNode}
+              className="text-xs px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors font-medium"
+              title="Ajouter un nœud racine (H1)"
+            >
+              + H1
+            </button>
             <button 
               onClick={expandAll}
               className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"

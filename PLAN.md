@@ -80,18 +80,63 @@ Rendre l'interface testable et fonctionnelle avec un appel réel aux APIs IA.
 
 ---
 
+## ✅ Phase 4.5 : Différenciation Discussion/Structure (TERMINÉ)
+
+### Objectif
+Améliorer la distinction entre les commentaires de l'IA et le contenu à intégrer, et faciliter la création de sous-sections.
+
+### 4.5.1 Format de réponse structuré
+**Réalisations** :
+- [x] Nouveau format de réponse IA avec 3 sections distinctes :
+  - 📣 **DISCUSSION** : Commentaires, analyses, explications (non intégrables)
+  - 📝 **CONTENU** : Contenu Markdown à intégrer dans le nœud actuel
+  - 🏗️ **SOUS-SECTIONS** : Propositions de sous-nœuds avec titres et descriptions
+- [x] Parser automatique des réponses IA (`parseAIResponse()`)
+- [x] Interface structurée pour afficher les sections de manière distincte
+
+### 4.5.2 Création automatique de sous-sections
+**Réalisations** :
+- [x] Extraction automatique des titres Markdown proposés par l'IA
+- [x] Bouton "Créer" pour chaque sous-section proposée
+- [x] Bouton "Créer toutes les sous-sections" pour création en masse
+- [x] Affichage du niveau (H2, H3, H4...) pour chaque sous-section proposée
+
+### 4.5.3 Amélioration UI création de nœuds
+**Réalisations** :
+- [x] Prompt de saisie du titre lors de la création d'un nœud enfant
+- [x] Affichage du niveau qui sera créé dans le tooltip ("Ajouter un H3")
+- [x] Désactivation du bouton "+" si profondeur maximale atteinte (H6)
+- [x] Bouton "+ H1" dans le header de la sidebar pour créer des nœuds racine
+- [x] Indicateur visuel clair du niveau de chaque nœud (badge H1, H2, H3...)
+
+---
+
+## ✅ Phase 5.1 : Import intelligent de fichiers (TERMINÉ)
+
+### Objectif
+Permettre l'importation de fichiers externes avec analyse IA automatique de la structure.
+
+### Réalisations
+- [x] Composant `ImportWizard` avec parcours guidé en 4 étapes
+- [x] Interface d'upload avec drag & drop + sélecteur de fichiers
+- [x] Support des formats : TXT, MD, PDF, DOCX
+- [x] Extraction automatique du contenu textuel
+- [x] Aperçu du contenu importé avec statistiques (caractères, mots)
+- [x] **Analyse IA de la structure** :
+  - Détection automatique des niveaux (Tomes → Chapitres → Sous-parties)
+  - Instructions personnalisables pour guider l'analyse
+  - Support de différents types de documents (romans, documents techniques)
+- [x] Interface de validation et modification de la structure détectée :
+  - Arbre hiérarchique éditable
+  - Modification des titres de sections
+  - Ajout/suppression de sections
+  - Indicateur visuel des niveaux (H1 à H6)
+- [x] Mode d'import : remplacer ou ajouter au document existant
+- [x] Import brut (sans analyse) disponible si préféré
+
+---
+
 ## 🔲 Phase 5 : Fonctionnalités avancées (FUTUR)
-
-### 5.1 Import intelligent de fichiers
-**Objectif** : Permettre l'importation de fichiers externes avec formatage IA automatique pour intégration au document.
-
-- [ ] Interface d'upload de fichiers (drag & drop + sélecteur)
-- [ ] Support des formats : TXT, MD, PDF, DOCX, HTML
-- [ ] Parsing et extraction du contenu textuel
-- [ ] Formatage IA : restructuration en Markdown conforme à la hiérarchie du document
-- [ ] Prévisualisation avant intégration
-- [ ] Choix du nœud de destination dans l'arborescence
-- [ ] Option de création automatique de sous-nœuds depuis les sections détectées
 
 ### 5.2 Collaboration et export
 - [ ] Export en PDF

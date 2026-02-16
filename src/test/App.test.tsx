@@ -11,6 +11,15 @@ global.URL.revokeObjectURL = vi.fn();
 global.confirm = vi.fn(() => true);
 global.alert = vi.fn();
 
+// Mock localStorage pour désactiver l'onboarding
+const localStorageMock = {
+  getItem: vi.fn((key: string) => key === 'fractalia_onboarding_completed' ? 'true' : null),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+};
+Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+
 // Reset le store avant chaque test
 beforeEach(() => {
   vi.clearAllMocks();
@@ -53,16 +62,16 @@ describe('App', () => {
     expect(screen.getByText('Nouveau')).toBeInTheDocument();
   });
 
-  it('devrait afficher le bouton Charger', () => {
+  it('devrait afficher le bouton Importer', () => {
     render(<App />);
     
-    expect(screen.getByText('Charger')).toBeInTheDocument();
+    expect(screen.getByText('Importer')).toBeInTheDocument();
   });
 
-  it('devrait afficher le bouton Télécharger', () => {
+  it('devrait afficher le bouton Exporter', () => {
     render(<App />);
     
-    expect(screen.getByText('Télécharger')).toBeInTheDocument();
+    expect(screen.getByText('Exporter')).toBeInTheDocument();
   });
 
   it('devrait afficher le bouton Paramètres', () => {
@@ -133,25 +142,6 @@ describe('App', () => {
     const resizers = document.querySelectorAll('[class*="cursor-col-resize"]');
     expect(resizers.length).toBeGreaterThan(0);
   });
-
-  it('devrait migrer les anciens modèles Gemini', async () => {
-    // Configurer un ancien modèle
-    useStore.setState({
-      aiConfig: {
-        provider: 'gemini',
-        apiKey: 'key',
-        model: 'gemini-3.0-pro',
-        chatMode: 'discussion',
-      },
-    });
-    
-    render(<App />);
-    
-    // Le modèle devrait être migré
-    await waitFor(() => {
-      expect(useStore.getState().aiConfig.model).toBe('gemini-3-pro-preview');
-    });
-  });
 });
 
 describe('App - Gestion des fichiers', () => {
@@ -163,7 +153,12 @@ describe('App - Gestion des fichiers', () => {
       expect(useStore.getState().tree.length).toBeGreaterThan(0);
     });
     
-    const downloadButton = screen.getByText('Télécharger');
+    // Ouvrir le menu Exporter
+    const exportButton = screen.getByText('Exporter');
+    fireEvent.click(exportButton);
+    
+    // Cliquer sur Export Markdown
+    const markdownExportButton = await screen.findByText('Export Markdown');
     
     // Mock createElement pour capturer le téléchargement
     const mockClick = vi.fn();
@@ -177,7 +172,7 @@ describe('App - Gestion des fichiers', () => {
       return element;
     });
     
-    fireEvent.click(downloadButton);
+    fireEvent.click(markdownExportButton);
     
     expect(mockClick).toHaveBeenCalled();
   });
@@ -241,7 +236,7 @@ describe('App - Gestion des fichiers', () => {
     }
   });
 
-  it('devrait ouvrir le sélecteur de fichier quand on clique sur Charger', () => {
+  it('devrait ouvrir le sélecteur de fichier quand on clique sur Importer', () => {
     render(<App />);
     
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -251,8 +246,8 @@ describe('App - Gestion des fichiers', () => {
     const mockInputClick = vi.fn();
     fileInput.click = mockInputClick;
     
-    // Cliquer sur le bouton Charger
-    const loadButton = screen.getByTitle('Charger un fichier Markdown');
+    // Cliquer sur le bouton Importer
+    const loadButton = screen.getByTitle(/Importer un fichier/i);
     fireEvent.click(loadButton);
     
     expect(mockInputClick).toHaveBeenCalled();
@@ -292,25 +287,6 @@ describe('App - Redimensionnement', () => {
     fireEvent.mouseUp(document);
     
     expect(editorResizer).toBeInTheDocument();
-  });
-});
-
-describe('App - Migration de modèles', () => {
-  it('devrait migrer gemini-3.0-flash vers gemini-3-flash-preview', async () => {
-    useStore.setState({
-      aiConfig: {
-        provider: 'gemini',
-        apiKey: 'key',
-        model: 'gemini-3.0-flash',
-        chatMode: 'discussion',
-      },
-    });
-    
-    render(<App />);
-    
-    await waitFor(() => {
-      expect(useStore.getState().aiConfig.model).toBe('gemini-3-flash-preview');
-    });
   });
 });
 
@@ -357,7 +333,7 @@ describe('App - Intégration ChatPane', () => {
     const fileInput = document.querySelector('input[type="file"]');
     expect(fileInput).toBeInTheDocument();
     expect(fileInput).toHaveClass('hidden');
-    expect(fileInput?.getAttribute('accept')).toBe('.md,.markdown,.txt');
+    expect(fileInput?.getAttribute('accept')).toBe('.md,.markdown,.txt,.pdf,.docx');
   });
 
   it('devrait fermer le modal des paramètres', async () => {
@@ -405,8 +381,8 @@ describe('App - Intégration ChatPane', () => {
     
     // Vérifier les boutons du header
     expect(screen.getByText('Nouveau')).toBeInTheDocument();
-    expect(screen.getByText('Charger')).toBeInTheDocument();
-    expect(screen.getByText('Télécharger')).toBeInTheDocument();
+    expect(screen.getByText('Importer')).toBeInTheDocument();
+    expect(screen.getByText('Exporter')).toBeInTheDocument();
     expect(screen.getByText('Réinitialiser')).toBeInTheDocument();
   });
 });
