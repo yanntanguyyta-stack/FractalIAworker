@@ -105,8 +105,9 @@ export interface AIContextSandwich {
   agentRole: string;
   agentInstructions: string;
   currentNodeContent: string;
+  childrenSummary: string;
   dependencies: NodeData[];
-  nodePath: NodeData[]; // Nouveau: chemin complet vers le nœud
+  nodePath: NodeData[];
 }
 
 /**
@@ -136,21 +137,39 @@ function findNodePath(nodes: NodeData[], targetId: string): NodeData[] {
 }
 
 /**
+ * Construire un résumé des enfants d'un nœud pour le contexte IA
+ */
+function buildChildrenSummary(children: NodeData[], indent: string = ''): string {
+  if (children.length === 0) return '';
+  return children.map(child => {
+    let line = `${indent}- ${'#'.repeat(child.headingDepth)} ${child.heading}`;
+    if (child.content.trim()) {
+      const preview = child.content.trim().split('\n')[0].substring(0, 100);
+      line += ` — ${preview}`;
+    }
+    if (child.children.length > 0) {
+      line += '\n' + buildChildrenSummary(child.children, indent + '  ');
+    }
+    return line;
+  }).join('\n');
+}
+
+/**
  * Construire le contexte sandwich pour un appel API IA
  */
 export function buildContextSandwich(
-  allNodes: NodeData[],
-  activeNode: NodeData
+  tree: NodeData[],
+  activeNode: NodeData | null
 ): AIContextSandwich {
   // Couche 1: Contexte global (tous les nœuds avec isGlobal: true)
-  const globalNodes = filterGlobalNodes(allNodes);
+  const globalNodes = filterGlobalNodes(tree);
   const globalContext = globalNodes
     .map(n => `## ${n.heading}\n${n.content}`)
     .join('\n\n');
 
   // Couche 2: Contexte hiérarchique (chemin des ancêtres)
-  const nodePath = findNodePath(allNodes, activeNode.id);
-  const ancestors = nodePath.slice(0, -1); // Exclure le nœud actif
+  const nodePath = activeNode ? findNodePath(tree, activeNode.id) : [];
+  const ancestors = nodePath.slice(0, -1);
   const hierarchicalContext = ancestors
     .map((node, index) => {
       const indent = '  '.repeat(index);
@@ -159,17 +178,21 @@ export function buildContextSandwich(
     .join('\n\n');
 
   // Couche 3: Configuration du rôle local
-  const agentRole = activeNode.meta.agentConfig?.role || 'Assistant';
-  const agentInstructions = activeNode.meta.agentConfig?.instructions || '';
+  const agentRole = activeNode?.meta.agentConfig?.role || 'Assistant';
+  const agentInstructions = activeNode?.meta.agentConfig?.instructions || '';
 
   // Couche 4: Contenu du nœud actif
-  const currentNodeContent = activeNode.content;
+  const currentNodeContent = activeNode ? activeNode.content : '';
+
+  // Couche 5: Résumé des enfants existants
+  const children = activeNode ? activeNode.children : tree;
+  const childrenSummary = buildChildrenSummary(children);
 
   // Gérer les dépendances explicites
   const dependencies: NodeData[] = [];
-  if (activeNode.meta.contextConfig?.dependencies) {
+  if (activeNode?.meta.contextConfig?.dependencies) {
     for (const depId of activeNode.meta.contextConfig.dependencies) {
-      const depNode = findNodeById(allNodes, depId);
+      const depNode = findNodeById(tree, depId);
       if (depNode) {
         dependencies.push(depNode);
       }
@@ -182,6 +205,7 @@ export function buildContextSandwich(
     agentRole,
     agentInstructions,
     currentNodeContent,
+    childrenSummary,
     dependencies,
     nodePath,
   };
@@ -328,19 +352,30 @@ Le nœud actif est le dernier de cette hiérarchie. Garde ce contexte parent en 
 
   // Instructions pour la création de sous-nœuds
   const currentNode = context.nodePath[context.nodePath.length - 1];
-  const currentDepth = currentNode?.headingDepth || 1;
+  const isDocumentRoot = !currentNode;
+  const currentDepth = isDocumentRoot ? 0 : currentNode.headingDepth;
   const childDepth = currentDepth + 1;
   const childHeadingPrefix = '#'.repeat(childDepth);
 
   prompt += `## STRUCTURE HIÉRARCHIQUE
-Tu travailles sur un nœud de niveau ${currentDepth} (profondeur de titre: ${'#'.repeat(currentDepth)}).
-Les sous-sections de ce nœud seront de niveau ${childDepth} (${childHeadingPrefix}).
+Tu travailles sur ${isDocumentRoot ? 'le document complet (racine)' : `un nœud de niveau ${currentDepth} (profondeur de titre: ${'#'.repeat(currentDepth)})`}.
+Les sous-sections seront de niveau ${childDepth} (${childHeadingPrefix}).
 
 **Dans la section 🏗️ SOUS-SECTIONS, utilise TOUJOURS des titres de niveau ${childDepth}** :
 ${childHeadingPrefix} Nom de la sous-section
 Description de ce que cette section doit contenir.
 
-**Quand proposer des sous-sections :**
+`;
+
+  if (context.childrenSummary) {
+    prompt += `## SOUS-SECTIONS EXISTANTES
+Les sous-sections suivantes existent déjà. NE LES PROPOSE PAS à nouveau sauf si l'utilisateur demande explicitement de les réorganiser :
+${context.childrenSummary}
+
+`;
+  }
+
+  prompt += `**Quand proposer des sous-sections :**
 - Le sujet peut être décomposé en parties distinctes
 - Plusieurs aspects différents doivent être traités
 - Une structure arborescente améliorerait la clarté
@@ -357,18 +392,23 @@ Description de ce que cette section doit contenir.
  */
 export function buildUserMessage(context: AIContextSandwich, userQuery: string): string {
   const currentNode = context.nodePath[context.nodePath.length - 1];
-  const nodeTitle = currentNode?.heading || 'Nœud actif';
+  const isDocumentRoot = !currentNode;
+  const nodeTitle = isDocumentRoot ? 'Document complet' : currentNode.heading;
   
-  let message = `## Nœud: ${nodeTitle}\n\n`;
+  let message = `## ${isDocumentRoot ? 'Document' : 'Nœud'}: ${nodeTitle}\n\n`;
   message += `**Votre demande**: ${userQuery}\n\n`;
   
   if (context.currentNodeContent) {
     message += `**Contenu actuel du nœud**:\n${context.currentNodeContent}\n\n`;
-  } else {
+  } else if (!isDocumentRoot) {
     message += `*Ce nœud est vide pour l'instant.*\n\n`;
   }
+
+  if (context.childrenSummary) {
+    message += `**Sous-sections existantes**:\n${context.childrenSummary}\n\n`;
+  }
   
-  message += `Réponds en tenant compte de la position de ce nœud dans la hiérarchie du document.`;
+  message += `Réponds en tenant compte de la position ${isDocumentRoot ? 'globale du document' : 'de ce nœud dans la hiérarchie du document'}.`;
   return message;
 }
 

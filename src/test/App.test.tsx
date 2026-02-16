@@ -236,21 +236,17 @@ describe('App - Gestion des fichiers', () => {
     }
   });
 
-  it('devrait ouvrir le sélecteur de fichier quand on clique sur Importer', () => {
+  it('devrait ouvrir le wizard d\'import quand on clique sur Importer', async () => {
     render(<App />);
-    
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(fileInput).toBeInTheDocument();
-    
-    // Mock le click sur l'input
-    const mockInputClick = vi.fn();
-    fileInput.click = mockInputClick;
     
     // Cliquer sur le bouton Importer
     const loadButton = screen.getByTitle(/Importer un fichier/i);
     fireEvent.click(loadButton);
     
-    expect(mockInputClick).toHaveBeenCalled();
+    // Le wizard d'import devrait s'ouvrir
+    await waitFor(() => {
+      expect(screen.getByText('Import de document')).toBeInTheDocument();
+    });
   });
 });
 

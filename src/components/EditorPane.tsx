@@ -13,7 +13,6 @@ import {
   Link,
   Image,
   Heading1,
-  Heading2,
   Eye,
   Edit3,
   Copy,
@@ -95,8 +94,10 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
     }
   }, [viewMode, activeNodeId, activeNode?.content]);
 
-  // Obtenir le contenu complet à afficher (nœud + enfants)
+  // Contenu complet (avec enfants, pour H0)
   const fullContent = getNodeFullContent(activeNodeId);
+  // Contenu pour l'aperçu (cohérent avec l'éditeur)
+  const previewContent = isDocRoot ? fullContent : (activeNode?.content || '');
   
   // Si ni H0 ni nœud actif, afficher un message
   if (!isDocRoot && !activeNode) {
@@ -154,25 +155,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
     }, 0);
   };
 
-  // Fonction pour créer un nœud enfant
-  const createChildNode = (levelOffset: number) => {
-    if (!activeNode) return;
-    const childLevel = activeNode.headingDepth + levelOffset;
-    if (childLevel > 6) {
-      alert(`Impossible de créer un nœud H${childLevel} (maximum H6)`);
-      return;
-    }
-    const title = prompt(`Créer un nouveau nœud enfant H${childLevel} :`);
-    if (title && title.trim()) {
-      addChild(activeNode.id, title.trim());
-      // Note: addChild crée toujours au niveau +1, mais on indique le niveau dans l'UI
-    }
-  };
-
   // Calculer les niveaux disponibles pour les sous-titres
   const currentLevel = activeNode?.headingDepth || 1;
-  const canCreateH1 = currentLevel < 6;
-  const canCreateH2 = currentLevel + 1 < 6;
+  const canCreateChild = currentLevel < 6;
 
   const toolbarButtons = [
     { icon: <Bold size={16} />, label: 'Gras', action: () => insertText('**', '**', 'texte gras') },
@@ -181,19 +166,12 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
     { divider: true },
     { 
       icon: <Heading1 size={16} />, 
-      label: `Créer H${currentLevel + 1} (enfant)`, 
-      action: () => createChildNode(1),
-      disabled: !canCreateH1
-    },
-    { 
-      icon: <Heading2 size={16} />, 
-      label: `Créer H${currentLevel + 2} (sous-enfant simulé)`, 
+      label: `Créer nœud enfant H${currentLevel + 1}`, 
       action: () => {
-        // Créer d'abord un enfant, puis un sous-enfant
         if (!activeNode) return;
         const childLevel = activeNode.headingDepth + 1;
-        if (childLevel >= 6) {
-          alert(`Impossible de créer un sous-nœud (maximum H6)`);
+        if (childLevel > 6) {
+          alert(`Impossible de créer un nœud H${childLevel} (maximum H6)`);
           return;
         }
         const title = prompt(`Créer un nouveau nœud enfant H${childLevel} :`);
@@ -201,7 +179,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
           addChild(activeNode.id, title.trim());
         }
       },
-      disabled: !canCreateH2
+      disabled: !canCreateChild
     },
     { divider: true },
     { icon: <List size={16} />, label: 'Liste', action: () => insertText('\n- ', '\n', 'élément') },
@@ -572,7 +550,7 @@ Utilisez la barre d'outils pour formater votre texte :
           </div>
         )}
 
-        {/* Preview - affiche le contenu complet (nœud + enfants) */}
+        {/* Preview - cohérent avec l'éditeur (contenu du nœud seul, ou document complet en H0) */}
         {(viewMode === 'preview' || viewMode === 'split' || isDocRoot) && (
           <div
             ref={previewRef}
@@ -580,7 +558,7 @@ Utilisez la barre d'outils pour formater votre texte :
           >
             <div
               className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: renderPreview(fullContent) }}
+              dangerouslySetInnerHTML={{ __html: renderPreview(previewContent) }}
             />
           </div>
         )}
@@ -588,8 +566,8 @@ Utilisez la barre d'outils pour formater votre texte :
 
       {/* Statistiques */}
       <div className="border-t border-gray-200 bg-gray-50 px-4 py-2 text-xs text-gray-600 flex justify-between">
-        <span>📝 {fullContent.length} caractères</span>
-        <span>📖 {fullContent.split(/\s+/).filter((w: string) => w).length} mots</span>
+        <span>📝 {previewContent.length} caractères</span>
+        <span>📖 {previewContent.split(/\s+/).filter((w: string) => w).length} mots</span>
         <span>📁 {isDocRoot ? tree.length + ' racine(s)' : (activeNode?.children.length || 0) + ' enfants'}</span>
       </div>
     </div>

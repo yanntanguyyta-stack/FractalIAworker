@@ -89,6 +89,9 @@ Contenu enfant`);
   });
 
   it('devrait ajouter un enfant quand on clique sur le bouton plus', async () => {
+    // Mock window.prompt to return a title for the new child
+    vi.spyOn(window, 'prompt').mockReturnValue('Nouveau nœud');
+    
     useStore.getState().loadMarkdown(`# Parent
 
 Contenu`);

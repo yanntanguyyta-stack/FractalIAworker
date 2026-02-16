@@ -343,7 +343,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   const withChildren = e.shiftKey || confirm(`Rétrograder "${node.heading}" de H${node.headingDepth} à H${node.headingDepth + 1}.\n\nInclure les enfants ? (Annuler = non)`);
                   const success = demoteNode(node.id, withChildren);
                   if (!success) {
-                    alert('Impossible de rétrograder : profondeur maximale atteinte.');
+                    alert('Impossible de rétrograder : pas de nœud frère précédent ou profondeur maximale atteinte.');
                   }
                 }}
                 className="p-1 hover:bg-orange-200 rounded node-action tooltip-wrapper flex-shrink-0 flex items-center"

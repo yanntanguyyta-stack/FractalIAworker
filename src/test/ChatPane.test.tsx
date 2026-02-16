@@ -317,12 +317,12 @@ describe('ChatPane', () => {
       expect(screen.getByText('Réponse IA')).toBeInTheDocument();
     }, { timeout: 3000 });
     
-    // Cliquer sur copier
-    const copyButton = screen.getByText('Copier');
+    // Cliquer sur copier tout
+    const copyButton = screen.getByText('Copier tout');
     fireEvent.click(copyButton);
     
     await waitFor(() => {
-      expect(screen.getByText('Copié')).toBeInTheDocument();
+      expect(screen.getByText('✓ Copié')).toBeInTheDocument();
     });
   });
 
@@ -330,7 +330,7 @@ describe('ChatPane', () => {
     (global.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({
-        candidates: [{ content: { parts: [{ text: 'Nouveau contenu ajouté' }] } }],
+        candidates: [{ content: { parts: [{ text: '📝 CONTENU\nNouveau contenu ajouté' }] } }],
       }),
     });
 
@@ -360,8 +360,8 @@ describe('ChatPane', () => {
       expect(screen.getByText('Nouveau contenu ajouté')).toBeInTheDocument();
     }, { timeout: 3000 });
     
-    // Cliquer sur Ajouter
-    const addButton = screen.getByText('+ Ajouter');
+    // Cliquer sur Ajouter au nœud (dans la section CONTENU parsée)
+    const addButton = screen.getByText(/Ajouter au nœud/);
     fireEvent.click(addButton);
     
     // Le contenu devrait être ajouté au nœud
@@ -378,7 +378,7 @@ describe('ChatPane', () => {
     (global.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({
-        candidates: [{ content: { parts: [{ text: 'Contenu remplacé' }] } }],
+        candidates: [{ content: { parts: [{ text: '📝 CONTENU\nContenu remplacé' }] } }],
       }),
     });
 

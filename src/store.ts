@@ -174,6 +174,34 @@ function insertNode(nodes: NodeData[], targetId: string | null, nodeToInsert: No
   });
 }
 
+// Trouver l'emplacement d'un nœud dans l'arbre (son conteneur et son index)
+function findNodeLocation(treeNodes: NodeData[], nodeId: string): {
+  container: NodeData[];
+  parent: NodeData | null;
+  index: number;
+} | null {
+  for (let i = 0; i < treeNodes.length; i++) {
+    if (treeNodes[i].id === nodeId) {
+      return { container: treeNodes, parent: null, index: i };
+    }
+  }
+  function traverse(nodes: NodeData[]): { container: NodeData[]; parent: NodeData; index: number } | null {
+    for (const node of nodes) {
+      for (let i = 0; i < node.children.length; i++) {
+        if (node.children[i].id === nodeId) {
+          return { container: node.children, parent: node, index: i };
+        }
+      }
+      if (node.children.length > 0) {
+        const result = traverse(node.children);
+        if (result) return result;
+      }
+    }
+    return null;
+  }
+  return traverse(treeNodes);
+}
+
 // Configuration IA par défaut
 const defaultAIConfig: AIConfig = {
   provider: 'gemini',
@@ -278,39 +306,42 @@ export const useStore = create<EditorState>()(
   canUndo: () => get().history.length > 0,
   canRedo: () => get().future.length > 0,
 
-  // Promouvoir un nœud (H2 → H1, etc.)
+  // Promouvoir un nœud : le remonter d'un niveau dans l'arbre
   promoteNode: (nodeId: string, withChildren: boolean) => {
     const { tree } = get();
     const node = findNodeById(tree, nodeId);
     if (!node || node.headingDepth <= 1) return false;
     
-    // Sauvegarder l'état avant modification
+    // Vérifier que le nœud n'est pas déjà à la racine de l'arbre
+    const location = findNodeLocation(tree, nodeId);
+    if (!location || !location.parent) return false;
+    
     (get() as any)._pushHistory();
     
-    function updateDepth(nodes: NodeData[]): NodeData[] {
-      return nodes.map(n => {
-        if (n.id === nodeId) {
-          if (withChildren) {
-            // Promouvoir le nœud et tous ses enfants
-            return adjustNodeDepth(n, -1);
-          } else {
-            // Promouvoir uniquement le nœud
-            return { ...n, headingDepth: n.headingDepth - 1 };
-          }
-        }
-        if (n.children.length > 0) {
-          return { ...n, children: updateDepth(n.children) };
-        }
-        return n;
-      });
-    }
+    // Deep clone pour mutation immutable
+    const newTree = JSON.parse(JSON.stringify(tree)) as NodeData[];
+    const loc = findNodeLocation(newTree, nodeId);
+    if (!loc || !loc.parent) return false;
     
-    const updated = updateDepth(tree);
-    set({ tree: updated });
+    // Retirer le nœud de son parent
+    const [removedNode] = loc.container.splice(loc.index, 1);
+    
+    // Ajuster la profondeur
+    const adjusted = withChildren
+      ? adjustNodeDepth(removedNode, -1)
+      : { ...removedNode, headingDepth: removedNode.headingDepth - 1 };
+    
+    // Trouver le parent dans l'arbre et insérer après lui
+    const parentLoc = findNodeLocation(newTree, loc.parent.id);
+    if (!parentLoc) return false;
+    
+    parentLoc.container.splice(parentLoc.index + 1, 0, adjusted);
+    
+    set({ tree: newTree });
     return true;
   },
 
-  // Rétrograder un nœud (H1 → H2, etc.)
+  // Rétrograder un nœud : le descendre d'un niveau (devient enfant du frère précédent)
   demoteNode: (nodeId: string, withChildren: boolean) => {
     const { tree } = get();
     const node = findNodeById(tree, nodeId);
@@ -318,35 +349,37 @@ export const useStore = create<EditorState>()(
     
     // Vérifier la profondeur maximale
     const maxDepth = getSubtreeMaxDepth(node);
-    const depthIncrease = withChildren ? 1 : 0;
-    if (node.headingDepth + 1 > MAX_HEADING_DEPTH || 
+    if (node.headingDepth + 1 > MAX_HEADING_DEPTH ||
         (withChildren && maxDepth + 1 > MAX_HEADING_DEPTH)) {
       return false;
     }
     
-    // Sauvegarder l'état avant modification
+    // Trouver l'emplacement du nœud et vérifier qu'il a un frère précédent
+    const location = findNodeLocation(tree, nodeId);
+    if (!location || location.index === 0) return false;
+    
     (get() as any)._pushHistory();
     
-    function updateDepth(nodes: NodeData[]): NodeData[] {
-      return nodes.map(n => {
-        if (n.id === nodeId) {
-          if (withChildren) {
-            // Rétrograder le nœud et tous ses enfants
-            return adjustNodeDepth(n, 1);
-          } else {
-            // Rétrograder uniquement le nœud
-            return { ...n, headingDepth: n.headingDepth + 1 };
-          }
-        }
-        if (n.children.length > 0) {
-          return { ...n, children: updateDepth(n.children) };
-        }
-        return n;
-      });
-    }
+    // Deep clone pour mutation immutable
+    const newTree = JSON.parse(JSON.stringify(tree)) as NodeData[];
+    const loc = findNodeLocation(newTree, nodeId);
+    if (!loc || loc.index === 0) return false;
     
-    const updated = updateDepth(tree);
-    set({ tree: updated });
+    // Obtenir le frère précédent
+    const prevSibling = loc.container[loc.index - 1];
+    
+    // Retirer le nœud de sa position actuelle
+    const [removedNode] = loc.container.splice(loc.index, 1);
+    
+    // Ajuster la profondeur
+    const adjusted = withChildren
+      ? adjustNodeDepth(removedNode, 1)
+      : { ...removedNode, headingDepth: removedNode.headingDepth + 1 };
+    
+    // Ajouter comme dernier enfant du frère précédent
+    prevSibling.children.push(adjusted);
+    
+    set({ tree: newTree });
     return true;
   },
 
@@ -448,14 +481,33 @@ export const useStore = create<EditorState>()(
     }
   },
 
-  // Ajouter un enfant à un nœud
+  // Ajouter un enfant à un nœud (ou un nœud racine H1 si parentId === DOCUMENT_ROOT_ID)
   addChild: (parentId: string, heading: string) => {
     const { tree } = get();
+    const { assessmentConfig } = get();
+    
+    // Cas spécial : ajouter un nœud racine (H1)
+    if (parentId === DOCUMENT_ROOT_ID) {
+      (get() as any)._pushHistory();
+      const newNode: NodeData = {
+        id: generateId(),
+        heading,
+        headingDepth: 1,
+        content: '',
+        meta: {
+          id: generateId(),
+          type: 'section',
+          evaluation: assessmentConfig.enabled ? { ...defaultEvaluation } : undefined,
+        },
+        children: [],
+      };
+      set({ tree: [...tree, newNode] });
+      return;
+    }
+    
     const parent = findNodeById(tree, parentId);
     if (parent) {
-      // Sauvegarder l'état avant modification
       (get() as any)._pushHistory();
-      const { assessmentConfig } = get();
       const newNode: NodeData = {
         id: generateId(),
         heading,

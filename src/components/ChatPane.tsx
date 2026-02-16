@@ -1,6 +1,6 @@
 import React from 'react';
 import { Send, Copy, Check, Settings, MessageSquare, FileText, Zap, ChevronDown, Plus, ChevronRight } from 'lucide-react';
-import { useStore, ChatMode } from '../store';
+import { useStore, ChatMode, DOCUMENT_ROOT_ID } from '../store';
 import { buildContextSandwich, buildSystemPrompt, buildUserMessage, callAIAPI, parseAIResponse, ParsedAIResponse, SubsectionProposal } from '../aiService';
 
 interface ChatMessage {
@@ -40,7 +40,7 @@ const promptTemplates = [
 ];
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
-  const { getActiveNode, getAllNodes, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild } = useStore();
+  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild } = useStore();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -75,9 +75,9 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   }, [messages]);
 
   const activeNode = getActiveNode();
-  const allNodes = getAllNodes();
+  const isDocRoot = activeNodeId === DOCUMENT_ROOT_ID;
 
-  if (!activeNode) {
+  if (!activeNode && !isDocRoot) {
     return (
       <div className={`bg-gray-50 flex items-center justify-center ${className}`}>
         <div className="text-center">
@@ -103,7 +103,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
 
     try {
       // Construire le contexte sandwich
-      const context = buildContextSandwich(allNodes, activeNode);
+      const context = buildContextSandwich(tree, activeNode);
       const systemPrompt = buildSystemPrompt(context, aiConfig.chatMode);
       const messageForAI = buildUserMessage(context, input);
 
@@ -138,6 +138,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   };
 
   const handleCommit = (messageContent: string, replaceContent: boolean = false) => {
+    if (!activeNode) return; // H0 : pas de nœud cible
     if (replaceContent) {
       updateNodeContent(activeNode.id, messageContent);
     } else {
@@ -166,11 +167,11 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
       <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50 p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-gray-900 truncate" title={activeNode.heading}>
-              📄 {activeNode.heading}
+            <h3 className="text-lg font-bold text-gray-900 truncate" title={activeNode?.heading || 'Document complet'}>
+              📄 {activeNode ? activeNode.heading : 'Document complet'}
             </h3>
-            <p className="text-sm text-purple-600 font-medium truncate" title={activeNode.meta.agentConfig?.role || 'Assistant IA'}>
-              🤖 <span className="italic">{activeNode.meta.agentConfig?.role || 'Assistant IA (rôle par défaut)'}</span>
+            <p className="text-sm text-purple-600 font-medium truncate" title={activeNode?.meta.agentConfig?.role || 'Assistant IA'}>
+              🤖 <span className="italic">{activeNode?.meta.agentConfig?.role || 'Assistant IA (rôle par défaut)'}</span>
             </p>
           </div>
           <button
@@ -324,6 +325,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                         {isSectionExpanded(idx, 'content') && (
                           <div className="p-3">
                             <p className="text-sm whitespace-pre-wrap break-words text-gray-800 mb-3">{msg.parsed.content}</p>
+                            {activeNode && (
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleCommit(msg.parsed!.content, false)}
@@ -343,6 +345,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                                 ↻ Remplacer
                               </button>
                             </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -380,7 +383,8 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                                 </div>
                                 <button
                                   onClick={() => {
-                                    addChild(activeNode.id, sub.title);
+                                    const targetId = activeNode ? activeNode.id : DOCUMENT_ROOT_ID;
+                                    addChild(targetId, sub.title);
                                   }}
                                   className="flex items-center gap-1 px-2 py-1 rounded bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors whitespace-nowrap"
                                   title="Créer ce nœud enfant"
@@ -393,8 +397,9 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                             <button
                               onClick={() => {
                                 if (confirm(`Créer les ${msg.parsed!.subsections.length} sous-sections ?`)) {
+                                  const targetId = activeNode ? activeNode.id : DOCUMENT_ROOT_ID;
                                   msg.parsed!.subsections.forEach(sub => {
-                                    addChild(activeNode.id, sub.title);
+                                    addChild(targetId, sub.title);
                                   });
                                 }
                               }}
@@ -419,12 +424,14 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                       >
                         {copiedId === idx ? <><Check size={12} /> Copié</> : <><Copy size={12} /> Copier</>}
                       </button>
+                      {activeNode && (
                       <button
                         onClick={() => handleCommit(msg.content, false)}
                         className="flex items-center gap-1 px-2 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-xs transition-colors"
                       >
                         + Ajouter
                       </button>
+                      )}
                     </div>
                   </div>
                 )}

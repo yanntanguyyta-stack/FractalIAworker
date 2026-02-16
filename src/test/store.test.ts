@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useStore } from '../store';
+import { useStore, DOCUMENT_ROOT_ID } from '../store';
 import type { NodeData } from '../types';
 
 // Reset le store avant chaque test
@@ -31,7 +31,7 @@ describe('Store - Actions de base', () => {
       const state = useStore.getState();
       expect(state.tree).toHaveLength(1);
       expect(state.tree[0].heading).toBe('Titre');
-      expect(state.activeNodeId).toBe(state.tree[0].id);
+      expect(state.activeNodeId).toBe(DOCUMENT_ROOT_ID);
     });
 
     it('devrait charger un document vide', () => {
@@ -39,7 +39,7 @@ describe('Store - Actions de base', () => {
       
       const state = useStore.getState();
       expect(state.tree).toHaveLength(0);
-      expect(state.activeNodeId).toBeNull();
+      expect(state.activeNodeId).toBe(DOCUMENT_ROOT_ID);
     });
 
     it('devrait charger un document avec hiérarchie', () => {
