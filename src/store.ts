@@ -57,6 +57,7 @@ interface EditorState {
   selectNode: (nodeId: string | null) => void;  // null = sélectionner H0
   selectDocumentRoot: () => void;  // Sélectionner le H0 (document complet)
   updateNodeContent: (nodeId: string, content: string) => void;
+  updateNodeHeading: (nodeId: string, heading: string) => void;  // Renommer un nœud
   updateNodeMeta: (nodeId: string, updates: Partial<NodeData['meta']>) => void;
   addChild: (parentId: string, heading: string) => void;
   deleteNode: (nodeId: string) => void;
@@ -424,6 +425,15 @@ export const useStore = create<EditorState>()(
     // Sauvegarder l'état avant modification
     (get() as any)._pushHistory();
     const updated = updateNodeInTree(tree, nodeId, { content });
+    set({ tree: updated });
+  },
+
+  // Renommer un nœud (modifier son heading)
+  updateNodeHeading: (nodeId: string, heading: string) => {
+    const { tree } = get();
+    // Sauvegarder l'état avant modification
+    (get() as any)._pushHistory();
+    const updated = updateNodeInTree(tree, nodeId, { heading });
     set({ tree: updated });
   },
 

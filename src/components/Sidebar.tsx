@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, ArrowUp, ArrowDown, FileText } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, FileText, Pencil, ChevronUp as LevelUp, ChevronDown as LevelDown } from 'lucide-react';
 import { useStore, DOCUMENT_ROOT_ID } from '../store';
 import { NodeData } from '../types';
 
@@ -100,7 +100,7 @@ function highlightMatch(text: string, term: string) {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
-  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode, demoteNode, selectDocumentRoot } = useStore();
+  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode, demoteNode, selectDocumentRoot, updateNodeHeading } = useStore();
   const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -305,7 +305,22 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               <Copy size={12} className="text-blue-600" />
             </button>
 
-            {/* Boutons Promouvoir/Rétrograder */}
+            {/* Bouton Renommer */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const newName = prompt(`Renommer "${node.heading}" :`, node.heading);
+                if (newName && newName.trim() && newName.trim() !== node.heading) {
+                  updateNodeHeading(node.id, newName.trim());
+                }
+              }}
+              className="p-1 hover:bg-cyan-200 rounded node-action tooltip-wrapper flex-shrink-0"
+              data-tooltip="Renommer"
+            >
+              <Pencil size={12} className="text-cyan-600" />
+            </button>
+
+            {/* Boutons Promouvoir/Rétrograder avec indicateurs de niveau */}
             {node.headingDepth > 1 && (
               <button
                 onClick={(e) => {
@@ -313,10 +328,11 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   const withChildren = e.shiftKey || confirm(`Promouvoir "${node.heading}" de H${node.headingDepth} à H${node.headingDepth - 1}.\n\nInclure les enfants ? (Annuler = non)`);
                   promoteNode(node.id, withChildren);
                 }}
-                className="p-1 hover:bg-amber-200 rounded node-action tooltip-wrapper flex-shrink-0"
-                data-tooltip="Promouvoir (Shift = avec enfants)"
+                className="p-1 hover:bg-amber-200 rounded node-action tooltip-wrapper flex-shrink-0 flex items-center"
+                data-tooltip={`Monter en H${node.headingDepth - 1} (Shift = avec enfants)`}
               >
-                <ArrowUp size={12} className="text-amber-600" />
+                <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1 rounded">H{node.headingDepth - 1}</span>
+                <LevelUp size={10} className="text-amber-600 -ml-0.5" />
               </button>
             )}
 
@@ -330,10 +346,11 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                     alert('Impossible de rétrograder : profondeur maximale atteinte.');
                   }
                 }}
-                className="p-1 hover:bg-orange-200 rounded node-action tooltip-wrapper flex-shrink-0"
-                data-tooltip="Rétrograder (Shift = avec enfants)"
+                className="p-1 hover:bg-orange-200 rounded node-action tooltip-wrapper flex-shrink-0 flex items-center"
+                data-tooltip={`Descendre en H${node.headingDepth + 1} (Shift = avec enfants)`}
               >
-                <ArrowDown size={12} className="text-orange-600" />
+                <span className="text-[9px] font-bold text-orange-700 bg-orange-100 px-1 rounded">H{node.headingDepth + 1}</span>
+                <LevelDown size={10} className="text-orange-600 -ml-0.5" />
               </button>
             )}
 

@@ -49,7 +49,8 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
     recalculateAllInheritedScores,
     getNodeFullContent,
     isDocumentRootSelected,
-    tree
+    tree,
+    addChild
   } = useStore();
   const activeNode = getActiveNode();
   const isDocRoot = isDocumentRootSelected();
@@ -153,13 +154,55 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
     }, 0);
   };
 
+  // Fonction pour créer un nœud enfant
+  const createChildNode = (levelOffset: number) => {
+    if (!activeNode) return;
+    const childLevel = activeNode.headingDepth + levelOffset;
+    if (childLevel > 6) {
+      alert(`Impossible de créer un nœud H${childLevel} (maximum H6)`);
+      return;
+    }
+    const title = prompt(`Créer un nouveau nœud enfant H${childLevel} :`);
+    if (title && title.trim()) {
+      addChild(activeNode.id, title.trim());
+      // Note: addChild crée toujours au niveau +1, mais on indique le niveau dans l'UI
+    }
+  };
+
+  // Calculer les niveaux disponibles pour les sous-titres
+  const currentLevel = activeNode?.headingDepth || 1;
+  const canCreateH1 = currentLevel < 6;
+  const canCreateH2 = currentLevel + 1 < 6;
+
   const toolbarButtons = [
     { icon: <Bold size={16} />, label: 'Gras', action: () => insertText('**', '**', 'texte gras') },
     { icon: <Italic size={16} />, label: 'Italique', action: () => insertText('*', '*', 'texte italique') },
     { icon: <Code size={16} />, label: 'Code inline', action: () => insertText('`', '`', 'code') },
     { divider: true },
-    { icon: <Heading1 size={16} />, label: 'Titre 1', action: () => insertText('\n## ', '\n', 'Titre') },
-    { icon: <Heading2 size={16} />, label: 'Titre 2', action: () => insertText('\n### ', '\n', 'Sous-titre') },
+    { 
+      icon: <Heading1 size={16} />, 
+      label: `Créer H${currentLevel + 1} (enfant)`, 
+      action: () => createChildNode(1),
+      disabled: !canCreateH1
+    },
+    { 
+      icon: <Heading2 size={16} />, 
+      label: `Créer H${currentLevel + 2} (sous-enfant simulé)`, 
+      action: () => {
+        // Créer d'abord un enfant, puis un sous-enfant
+        if (!activeNode) return;
+        const childLevel = activeNode.headingDepth + 1;
+        if (childLevel >= 6) {
+          alert(`Impossible de créer un sous-nœud (maximum H6)`);
+          return;
+        }
+        const title = prompt(`Créer un nouveau nœud enfant H${childLevel} :`);
+        if (title && title.trim()) {
+          addChild(activeNode.id, title.trim());
+        }
+      },
+      disabled: !canCreateH2
+    },
     { divider: true },
     { icon: <List size={16} />, label: 'Liste', action: () => insertText('\n- ', '\n', 'élément') },
     { icon: <ListOrdered size={16} />, label: 'Liste numérotée', action: () => insertText('\n1. ', '\n', 'élément') },
