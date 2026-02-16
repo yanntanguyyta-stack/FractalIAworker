@@ -1,4 +1,4 @@
-# Plan de travail — IRLM Node Interface
+# Plan de travail — Node IA Worker
 
 ## ✅ Phase 1 : Activation Gemini/OpenAI (TERMINÉ)
 

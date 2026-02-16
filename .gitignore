@@ -10,3 +10,5 @@ dist/
 *.swo
 *~
 .turbo/
+.vercel
+.env*.local

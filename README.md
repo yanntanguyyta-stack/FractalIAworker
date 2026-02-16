@@ -1,4 +1,4 @@
-# 🧠 IRLM Node Interface V2
+# 🧠 Node IA Worker
 
 **Architecture & Développement - Local-First Markdown Collaboration avec IA Persona**
 

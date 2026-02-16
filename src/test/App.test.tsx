@@ -44,7 +44,7 @@ describe('App', () => {
   it('devrait rendre l\'application avec le titre', () => {
     render(<App />);
     
-    expect(screen.getByText(/IRLM Node Interface/i)).toBeInTheDocument();
+    expect(screen.getByText(/Node IA Worker/i)).toBeInTheDocument();
   });
 
   it('devrait charger les données initiales au montage', async () => {

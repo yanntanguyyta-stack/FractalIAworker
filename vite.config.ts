@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-192.svg', 'pwa-512.svg'],
       manifest: {
-        name: 'IRLM Node Interface',
-        short_name: 'IRLM Node',
+        name: 'Node IA Worker',
+        short_name: 'Node IA',
         description: 'Collaboration IA local-first basée sur Markdown',
         theme_color: '#4F46E5',
         background_color: '#F9FAFB',

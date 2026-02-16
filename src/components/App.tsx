@@ -106,7 +106,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     return () => document.removeEventListener('click', closeMenu);
   }, [showExportMenu]);
 
-  const getExportTitle = () => tree[0]?.heading?.trim() || 'document-irlm';
+  const getExportTitle = () => tree[0]?.heading?.trim() || 'document-node-ia';
 
   const triggerDownload = (content: string, filename: string, type: string) => {
     const element = document.createElement('a');
@@ -164,7 +164,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       try {
         await navigator.share({
           title: getExportTitle(),
-          text: 'Partage du document IRLM',
+          text: 'Partage du document Node IA Worker',
           url: shareUrl,
         });
         return;
@@ -245,7 +245,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 text-white px-6 py-4 shadow-lg">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">🧠 IRLM Node Interface</h1>
+            <h1 className="text-2xl font-bold">🧠 Node IA Worker</h1>
             <p className="text-slate-200 text-sm">
               Local-First Markdown Collaboration avec IA Persona
             </p>
