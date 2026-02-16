@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, FileText, Pencil, ChevronUp as LevelUp, ChevronDown as LevelDown } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, FileText, Pencil, ChevronUp as LevelUp, ChevronDown as LevelDown, MoreHorizontal } from 'lucide-react';
 import { useStore, DOCUMENT_ROOT_ID } from '../store';
 import { NodeData } from '../types';
 
@@ -107,7 +107,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const [draggedNodeId, setDraggedNodeId] = React.useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = React.useState<string | null>(null);
 
-  // Expand all by default on first load
+  // Expand all by default on first load, and re-expand new nodes on tree change
+  const prevTreeRef = React.useRef<string>('');
   React.useEffect(() => {
     const allIds = new Set<string>();
     function collectIds(nodes: NodeData[]) {
@@ -119,8 +120,17 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
       }
     }
     collectIds(tree);
-    setExpanded(allIds);
-  }, [tree.length]); // Re-expand when tree changes
+    const treeSignature = Array.from(allIds).sort().join(',');
+    if (treeSignature !== prevTreeRef.current) {
+      // Ajouter les nouveaux IDs sans supprimer les anciens
+      setExpanded(prev => {
+        const merged = new Set(prev);
+        allIds.forEach(id => merged.add(id));
+        return merged;
+      });
+      prevTreeRef.current = treeSignature;
+    }
+  }, [tree]);
 
   const toggleExpanded = (nodeId: string) => {
     const newExpanded = new Set(expanded);
@@ -268,9 +278,17 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                 ({node.children.length})
               </span>
             )}
+          </div>
+        </div>
 
-            {/* Bouton Ajouter enfant - désactivé si niveau max atteint */}
-            {node.headingDepth < 6 ? (
+        {/* Barre d'outils contextuelle - apparaît sous le nœud actif */}
+        {isActive && (
+          <div 
+            className="flex items-center gap-1 px-2 py-1 mx-1 mb-1 bg-slate-100 rounded-md border border-slate-200 flex-wrap"
+            style={{ marginLeft: `${depth * 16 + 8}px` }}
+          >
+            {/* Ajouter enfant */}
+            {node.headingDepth < 6 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -280,32 +298,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                     addChild(node.id, title.trim());
                   }
                 }}
-                className="p-1 hover:bg-green-200 rounded node-action tooltip-wrapper flex-shrink-0"
-                data-tooltip={`Ajouter un H${node.headingDepth + 1}`}
+                className="p-1.5 hover:bg-green-200 rounded text-green-700 tooltip-wrapper"
+                data-tooltip={`Ajouter H${node.headingDepth + 1}`}
               >
-                <Plus size={12} className="text-green-600" />
+                <Plus size={14} />
               </button>
-            ) : (
-              <span 
-                className="p-1 text-gray-300 cursor-not-allowed flex-shrink-0" 
-                title="Profondeur maximale atteinte (H6)"
-              >
-                <Plus size={12} />
-              </span>
             )}
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                copyNode(node.id);
-              }}
-              className="p-1 hover:bg-blue-200 rounded node-action tooltip-wrapper flex-shrink-0"
-              data-tooltip="Copier"
-            >
-              <Copy size={12} className="text-blue-600" />
-            </button>
-
-            {/* Bouton Renommer */}
+            {/* Renommer */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -314,59 +314,76 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   updateNodeHeading(node.id, newName.trim());
                 }
               }}
-              className="p-1 hover:bg-cyan-200 rounded node-action tooltip-wrapper flex-shrink-0"
+              className="p-1.5 hover:bg-cyan-200 rounded text-cyan-700 tooltip-wrapper"
               data-tooltip="Renommer"
             >
-              <Pencil size={12} className="text-cyan-600" />
+              <Pencil size={14} />
             </button>
 
-            {/* Boutons Promouvoir/Rétrograder avec indicateurs de niveau */}
-            {node.headingDepth > 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const withChildren = e.shiftKey || confirm(`Promouvoir "${node.heading}" de H${node.headingDepth} à H${node.headingDepth - 1}.\n\nInclure les enfants ? (Annuler = non)`);
-                  promoteNode(node.id, withChildren);
-                }}
-                className="p-1 hover:bg-amber-200 rounded node-action tooltip-wrapper flex-shrink-0 flex items-center"
-                data-tooltip={`Monter en H${node.headingDepth - 1} (Shift = avec enfants)`}
-              >
-                <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1 rounded">H{node.headingDepth - 1}</span>
-                <LevelUp size={10} className="text-amber-600 -ml-0.5" />
-              </button>
-            )}
+            {/* Copier */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                copyNode(node.id);
+              }}
+              className="p-1.5 hover:bg-blue-200 rounded text-blue-700 tooltip-wrapper"
+              data-tooltip="Copier"
+            >
+              <Copy size={14} />
+            </button>
 
-            {node.headingDepth < 6 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const withChildren = e.shiftKey || confirm(`Rétrograder "${node.heading}" de H${node.headingDepth} à H${node.headingDepth + 1}.\n\nInclure les enfants ? (Annuler = non)`);
-                  const success = demoteNode(node.id, withChildren);
-                  if (!success) {
-                    alert('Impossible de rétrograder : pas de nœud frère précédent ou profondeur maximale atteinte.');
-                  }
-                }}
-                className="p-1 hover:bg-orange-200 rounded node-action tooltip-wrapper flex-shrink-0 flex items-center"
-                data-tooltip={`Descendre en H${node.headingDepth + 1} (Shift = avec enfants)`}
-              >
-                <span className="text-[9px] font-bold text-orange-700 bg-orange-100 px-1 rounded">H{node.headingDepth + 1}</span>
-                <LevelDown size={10} className="text-orange-600 -ml-0.5" />
-              </button>
-            )}
-
+            {/* Coller */}
             {clipboardNode && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePasteNode(node.id);
                 }}
-                className="p-1 hover:bg-indigo-200 rounded node-action tooltip-wrapper flex-shrink-0"
+                className="p-1.5 hover:bg-indigo-200 rounded text-indigo-700 tooltip-wrapper"
                 data-tooltip="Coller comme enfant"
               >
-                <ClipboardPaste size={12} className="text-indigo-600" />
+                <ClipboardPaste size={14} />
               </button>
             )}
 
+            <span className="w-px h-5 bg-slate-300 mx-0.5" />
+
+            {/* Promouvoir */}
+            {node.headingDepth > 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  promoteNode(node.id, true);
+                }}
+                className="p-1.5 hover:bg-amber-200 rounded tooltip-wrapper flex items-center gap-0.5"
+                data-tooltip={`Promouvoir en H${node.headingDepth - 1}`}
+              >
+                <LevelUp size={14} className="text-amber-700" />
+                <span className="text-[9px] font-bold text-amber-700">H{node.headingDepth - 1}</span>
+              </button>
+            )}
+
+            {/* Rétrograder */}
+            {node.headingDepth < 6 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const success = demoteNode(node.id, true);
+                  if (!success) {
+                    alert('Impossible : pas de nœud frère précédent ou profondeur max atteinte.');
+                  }
+                }}
+                className="p-1.5 hover:bg-orange-200 rounded tooltip-wrapper flex items-center gap-0.5"
+                data-tooltip={`Rétrograder en H${node.headingDepth + 1}`}
+              >
+                <LevelDown size={14} className="text-orange-700" />
+                <span className="text-[9px] font-bold text-orange-700">H{node.headingDepth + 1}</span>
+              </button>
+            )}
+
+            <span className="w-px h-5 bg-slate-300 mx-0.5" />
+
+            {/* Supprimer */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -374,13 +391,13 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   deleteNode(node.id);
                 }
               }}
-              className="p-1 hover:bg-red-200 rounded node-action tooltip-wrapper flex-shrink-0"
+              className="p-1.5 hover:bg-red-200 rounded text-red-600 tooltip-wrapper"
               data-tooltip="Supprimer"
             >
-              <Trash2 size={12} className="text-red-600" />
+              <Trash2 size={14} />
             </button>
           </div>
-        </div>
+        )}
 
         {hasChildren && isExpanded && (
           <div className="relative">

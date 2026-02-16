@@ -59,6 +59,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const editablePreviewRef = useRef<HTMLDivElement>(null);
   const prevNodeIdRef = useRef<string | null>(null);
 
   // Forcer le mode preview quand H0 est sélectionné
@@ -80,17 +81,20 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
 
   // Render Mermaid diagrams
   useEffect(() => {
-    if (viewMode !== 'edit' && previewRef.current) {
-      const mermaidDivs = previewRef.current.querySelectorAll('.mermaid');
-      mermaidDivs.forEach(async (div, index) => {
-        const code = div.textContent || '';
-        try {
-          const { svg } = await mermaid.render(`mermaid-${activeNodeId}-${index}`, code);
-          div.innerHTML = svg;
-        } catch (e) {
-          div.innerHTML = `<pre class="text-red-500 text-sm">Erreur Mermaid: ${e}</pre>`;
-        }
-      });
+    if (viewMode !== 'edit') {
+      const container = previewRef.current || editablePreviewRef.current;
+      if (container) {
+        const mermaidDivs = container.querySelectorAll('.mermaid');
+        mermaidDivs.forEach(async (div, index) => {
+          const code = div.textContent || '';
+          try {
+            const { svg } = await mermaid.render(`mermaid-${activeNodeId}-${index}`, code);
+            div.innerHTML = svg;
+          } catch (e) {
+            div.innerHTML = `<pre class="text-red-500 text-sm">Erreur Mermaid: ${e}</pre>`;
+          }
+        });
+      }
     }
   }, [viewMode, activeNodeId, activeNode?.content]);
 
@@ -531,9 +535,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
 
       {/* Éditeur de contenu */}
       <div className="flex-1 overflow-hidden flex min-h-0">
-        {/* Editor - uniquement si nœud spécifique sélectionné */}
-        {!isDocRoot && (viewMode === 'edit' || viewMode === 'split') && activeNode && (
-          <div className={`${viewMode === 'split' ? 'w-1/2 border-r border-gray-200' : 'w-full'} flex flex-col overflow-hidden`}>
+        {/* Editor textarea - uniquement si nœud spécifique sélectionné en mode edit */}
+        {!isDocRoot && viewMode === 'edit' && activeNode && (
+          <div className="w-full flex flex-col overflow-hidden">
             <textarea
               ref={textareaRef}
               value={activeNode.content}
@@ -550,11 +554,58 @@ Utilisez la barre d'outils pour formater votre texte :
           </div>
         )}
 
-        {/* Preview - cohérent avec l'éditeur (contenu du nœud seul, ou document complet en H0) */}
-        {(viewMode === 'preview' || viewMode === 'split' || isDocRoot) && (
+        {/* Split mode: textarea + preview */}
+        {!isDocRoot && viewMode === 'split' && activeNode && (
+          <>
+            <div className="w-1/2 border-r border-gray-200 flex flex-col overflow-hidden">
+              <textarea
+                ref={textareaRef}
+                value={activeNode.content}
+                onChange={(e) => updateNodeContent(activeNode.id, e.target.value)}
+                placeholder="Entrez le contenu du nœud..."
+                className="w-full h-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed overflow-y-auto"
+              />
+            </div>
+            <div
+              ref={previewRef}
+              className="w-1/2 overflow-y-auto p-4 bg-white"
+            >
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: renderPreview(previewContent) }}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Preview éditable : quand on est en mode preview sur un nœud (pas H0) */}
+        {!isDocRoot && viewMode === 'preview' && activeNode && (
+          <div
+            ref={editablePreviewRef}
+            className="w-full overflow-y-auto p-4 bg-white"
+          >
+            <div
+              className="prose prose-sm max-w-none focus:outline-none editable-preview"
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={(e) => {
+                // Extraire le texte brut du contentEditable
+                const el = e.currentTarget;
+                const text = el.innerText || '';
+                if (text !== activeNode.content) {
+                  updateNodeContent(activeNode.id, text);
+                }
+              }}
+              dangerouslySetInnerHTML={{ __html: renderPreview(previewContent) }}
+            />
+          </div>
+        )}
+
+        {/* H0 : preview non éditable (document complet en lecture seule) */}
+        {isDocRoot && (
           <div
             ref={previewRef}
-            className={`${!isDocRoot && viewMode === 'split' ? 'w-1/2' : 'w-full'} overflow-y-auto p-4 bg-white`}
+            className="w-full overflow-y-auto p-4 bg-white"
           >
             <div
               className="prose prose-sm max-w-none"
