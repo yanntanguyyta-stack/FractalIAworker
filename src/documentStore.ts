@@ -13,6 +13,7 @@ export interface DocumentMeta {
   createdAt: number;
   updatedAt: number;
   nodeCount?: number;
+  tags?: string[];
 }
 
 export interface DocumentIndex {
@@ -189,4 +190,16 @@ export function duplicateDocument(userId: string, docId: string): string | null 
   const original = index.documents.find(d => d.id === docId);
   if (!tree || !original) return null;
   return createDocument(userId, `${original.name} (copie)`, tree);
+}
+
+/**
+ * Met à jour les tags d'un document
+ */
+export function updateDocumentTags(userId: string, docId: string, tags: string[]): void {
+  const index = loadDocumentIndex(userId);
+  const doc = index.documents.find(d => d.id === docId);
+  if (doc) {
+    doc.tags = tags.map(t => t.trim()).filter(t => t.length > 0);
+    saveDocumentIndex(userId, index);
+  }
 }

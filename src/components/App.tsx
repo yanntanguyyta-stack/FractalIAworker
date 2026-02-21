@@ -13,6 +13,7 @@ import AdminDashboard from './AdminDashboard';
 import DocumentManager from './DocumentManager';
 import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User, FolderOpen } from 'lucide-react';
 import { buildHtmlDocument, buildPrintHtmlDocument, buildWordDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
+import { buildDocxBlob } from '../utils/docxExport';
 import {
   loadDocumentIndex,
   loadDocumentTree,
@@ -244,6 +245,19 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     );
   };
 
+  const handleExportDocxNative = async () => {
+    const markdown = saveToMarkdown();
+    const blob = await buildDocxBlob(markdown, getExportTitle());
+    const url = URL.createObjectURL(blob);
+    const element = document.createElement('a');
+    element.href = url;
+    element.download = `${getExportTitle()}.docx`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    URL.revokeObjectURL(url);
+  };
+
     const handleExportPdf = () => {
     const markdown = saveToMarkdown();
     const html = buildPrintHtmlDocument(markdown, getExportTitle());
@@ -428,6 +442,16 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
                   >
                     <FileText size={16} className="text-green-600" />
                     Export Word (.doc)
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportDocxNative();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                  >
+                    <FileText size={16} className="text-emerald-700" />
+                    Export Word (.docx)
                   </button>
                   <button
                     onClick={() => {

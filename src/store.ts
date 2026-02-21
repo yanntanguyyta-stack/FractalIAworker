@@ -51,6 +51,9 @@ interface EditorState {
   aiConfig: AIConfig;
   assessmentConfig: AssessmentConfig;
 
+  // IA d'assistance éditoriale
+  pendingAIPrompt: string | null;
+
   // Actions
   loadMarkdown: (markdown: string) => void;
   loadTree: (tree: NodeData[]) => void;
@@ -84,6 +87,7 @@ interface EditorState {
   // Actions IA
   setAIConfig: (config: AIConfig) => void;
   setChatMode: (mode: ChatMode) => void;
+  setPendingAIPrompt: (prompt: string | null) => void;
 
   // Actions Évaluation
   setAssessmentConfig: (config: AssessmentConfig) => void;
@@ -248,6 +252,7 @@ export const useStore = create<EditorState>()(
       future: [],
       aiConfig: defaultAIConfig,
       assessmentConfig: defaultAssessmentConfig,
+      pendingAIPrompt: null,
 
   // Helper interne pour sauvegarder l'état dans l'historique
   _pushHistory: () => {
@@ -657,6 +662,11 @@ export const useStore = create<EditorState>()(
   setChatMode: (mode: ChatMode) => {
     const { aiConfig } = get();
     set({ aiConfig: { ...aiConfig, chatMode: mode } });
+  },
+
+  // Définir un prompt IA en attente (pour l'assistance éditoriale)
+  setPendingAIPrompt: (prompt: string | null) => {
+    set({ pendingAIPrompt: prompt });
   },
 
   setAssessmentConfig: (config: AssessmentConfig) => {
