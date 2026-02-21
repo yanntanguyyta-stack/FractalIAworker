@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Key, Check, AlertCircle } from 'lucide-react';
 import { useStore } from '../store';
+import { useAuthStore } from '../authStore';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { aiConfig, assessmentConfig, setAIConfig, setAssessmentConfig } = useStore();
+  const { saveApiConfig } = useAuthStore();
   const [provider, setProvider] = React.useState(aiConfig.provider);
   const [apiKey, setApiKey] = React.useState(aiConfig.apiKey);
   const [model, setModel] = React.useState(aiConfig.model);
@@ -52,12 +54,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   }, [isOpen, aiConfig, assessmentConfig]);
 
   const handleSave = () => {
-    setAIConfig({
+    const newConfig = {
       provider,
       apiKey,
       model,
       chatMode: aiConfig.chatMode,
-    });
+    };
+    setAIConfig(newConfig);
+    saveApiConfig({ provider, apiKey, model });
     setAssessmentConfig({
       enabled: assessmentEnabled,
       question: assessmentQuestion.trim(),
