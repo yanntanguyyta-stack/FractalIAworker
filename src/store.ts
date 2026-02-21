@@ -53,6 +53,7 @@ interface EditorState {
 
   // Actions
   loadMarkdown: (markdown: string) => void;
+  loadTree: (tree: NodeData[]) => void;
   saveToMarkdown: () => string;
   selectNode: (nodeId: string | null) => void;  // null = sélectionner H0
   selectDocumentRoot: () => void;  // Sélectionner le H0 (document complet)
@@ -390,6 +391,11 @@ export const useStore = create<EditorState>()(
     const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsedTree) : parsedTree;
     // Par défaut, sélectionner le document complet (H0)
     set({ tree, markdown, activeNodeId: DOCUMENT_ROOT_ID, history: [], future: [] });
+  },
+
+  // Charger un arbre directement (restauration depuis le stockage utilisateur)
+  loadTree: (tree: NodeData[]) => {
+    set({ tree, activeNodeId: DOCUMENT_ROOT_ID, history: [], future: [] });
   },
 
   // Sauvegarder l'arbre en Markdown

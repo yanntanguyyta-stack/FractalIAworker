@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useStore } from '../store';
+import { useAuthStore } from '../authStore';
 import { INITIAL_MARKDOWN } from '../mockData';
 import Sidebar from './Sidebar';
 import EditorPane from './EditorPane';
@@ -8,7 +9,8 @@ import SettingsModal from './SettingsModal';
 import NewDocumentWizard from './NewDocumentWizard';
 import OnboardingWizard from './OnboardingWizard';
 import ImportWizard from './ImportWizard';
-import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle } from 'lucide-react';
+import AdminDashboard from './AdminDashboard';
+import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User } from 'lucide-react';
 import { buildHtmlDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
 
 const ONBOARDING_COMPLETED_KEY = 'fractalia_onboarding_completed';
@@ -18,13 +20,15 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ className = '' }) => {
-  const { loadMarkdown, tree, saveToMarkdown, aiConfig, undo, redo, canUndo, canRedo } = useStore();
+  const { loadMarkdown, loadTree, tree, saveToMarkdown, aiConfig, setAIConfig, undo, redo, canUndo, canRedo } = useStore();
+  const { currentUser, logout, saveApiConfig, updateLastActive } = useAuthStore();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newDocWizardOpen, setNewDocWizardOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const dragCounter = useRef(0);
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
@@ -42,7 +46,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef<'sidebar' | 'editor' | null>(null);
 
-  // Charger les données mock ou partagées au premier rendu
+  // Charger les données au montage (partagées, utilisateur ou mock)
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.startsWith('#share=')) {
@@ -55,8 +59,43 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
         console.error('Erreur lors du décodage du lien partagé:', error);
       }
     }
+
+    if (currentUser) {
+      // Restaurer les documents sauvegardés de l'utilisateur
+      try {
+        const savedDocs = localStorage.getItem(`fractalia-docs-${currentUser.id}`);
+        if (savedDocs) {
+          const parsedTree = JSON.parse(savedDocs);
+          loadTree(parsedTree);
+          return;
+        }
+      } catch {
+        // Continuer avec les données mock si la restauration échoue
+      }
+
+      // Charger la configuration IA sauvegardée de l'utilisateur
+      if (currentUser.savedApiConfig) {
+        setAIConfig({ ...aiConfig, ...currentUser.savedApiConfig });
+      }
+    }
+
     loadMarkdown(INITIAL_MARKDOWN);
-  }, []);
+  }, [currentUser?.id]);
+
+  // Sauvegarde automatique des documents par utilisateur
+  useEffect(() => {
+    if (currentUser && tree.length > 0) {
+      localStorage.setItem(`fractalia-docs-${currentUser.id}`, JSON.stringify(tree));
+    }
+  }, [tree, currentUser?.id]);
+
+  // Mise à jour de l'activité utilisateur
+  useEffect(() => {
+    if (!currentUser) return;
+    updateLastActive();
+    const interval = setInterval(updateLastActive, 5 * 60 * 1000); // toutes les 5 min
+    return () => clearInterval(interval);
+  }, [currentUser?.id]);
 
   // Gestionnaire de redimensionnement
   const handleMouseDown = useCallback((separator: 'sidebar' | 'editor') => {
@@ -395,6 +434,33 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
               <HelpCircle size={18} />
               Aide
             </button>
+
+            {currentUser && (
+              <>
+                {currentUser.isAdmin && (
+                  <button
+                    onClick={() => setAdminOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded-xl font-medium transition-colors shadow-sm"
+                    title="Tableau de bord admin"
+                  >
+                    <Shield size={18} />
+                    Admin
+                  </button>
+                )}
+                <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl text-sm">
+                  <User size={16} />
+                  <span className="max-w-24 truncate">{currentUser.name}</span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors shadow-sm"
+                  title="Se déconnecter"
+                >
+                  <LogOut size={18} />
+                  Déconnexion
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -487,6 +553,9 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
         isOpen={importWizardOpen} 
         onClose={() => setImportWizardOpen(false)}
       />
+
+      {/* Tableau de bord Admin */}
+      <AdminDashboard isOpen={adminOpen} onClose={() => setAdminOpen(false)} />
     </div>
   );
 };
