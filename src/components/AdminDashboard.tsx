@@ -1,6 +1,6 @@
 import React from 'react';
-import { X, Users, Activity, Clock, Shield } from 'lucide-react';
-import { useAuthStore } from '../authStore';
+import { X, Users, Shield, ExternalLink } from 'lucide-react';
+import { useUser } from '@clerk/clerk-react';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -8,26 +8,11 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
-  const { getAllUsers, currentUser } = useAuthStore();
+  const { user } = useUser();
 
-  if (!isOpen || !currentUser?.isAdmin) return null;
+  const isAdmin = (user?.publicMetadata as Record<string, unknown>)?.role === 'admin';
 
-  const users = getAllUsers();
-  const now = Date.now();
-  const DAY = 24 * 60 * 60 * 1000;
-  const WEEK = 7 * DAY;
-
-  const activeToday = users.filter(u => now - u.lastActiveAt < DAY).length;
-  const activeThisWeek = users.filter(u => now - u.lastActiveAt < WEEK).length;
-
-  const formatDate = (ts: number) =>
-    new Date(ts).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  if (!isOpen || !isAdmin) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -48,23 +33,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         </div>
 
         <div className="overflow-y-auto flex-1 p-6 space-y-6">
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-center">
-              <Users size={24} className="text-indigo-600 mx-auto mb-2" />
-              <p className="text-3xl font-bold text-indigo-700">{users.length}</p>
-              <p className="text-sm text-indigo-600">Utilisateurs total</p>
+          {/* Info admin */}
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center gap-4">
+            <Users size={28} className="text-indigo-600" />
+            <div>
+              <p className="text-sm font-medium text-indigo-800">
+                Connecté en tant qu'administrateur
+              </p>
+              <p className="text-xs text-indigo-600">{user?.primaryEmailAddress?.emailAddress}</p>
             </div>
-            <div className="bg-green-50 border border-green-100 rounded-xl p-4 text-center">
-              <Activity size={24} className="text-green-600 mx-auto mb-2" />
-              <p className="text-3xl font-bold text-green-700">{activeToday}</p>
-              <p className="text-sm text-green-600">Actifs aujourd'hui</p>
-            </div>
-            <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 text-center">
-              <Clock size={24} className="text-purple-600 mx-auto mb-2" />
-              <p className="text-3xl font-bold text-purple-700">{activeThisWeek}</p>
-              <p className="text-sm text-purple-600">Actifs cette semaine</p>
-            </div>
+          </div>
+
+          {/* Clerk Dashboard link */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-medium text-slate-700 mb-1">
+              👤 Gestion des utilisateurs
+            </p>
+            <p className="text-xs text-slate-500">
+              La gestion des utilisateurs (création, suppression, rôles, sessions actives) est
+              disponible dans le{' '}
+              <a
+                href="https://dashboard.clerk.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 hover:underline inline-flex items-center gap-1"
+              >
+                tableau de bord Clerk <ExternalLink size={12} />
+              </a>
+              . Vous y trouverez la liste complète des utilisateurs, les statistiques
+              d'authentification et les logs de sécurité.
+            </p>
           </div>
 
           {/* Analytics link */}
@@ -77,54 +75,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
                 href="https://vercel.com/analytics"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-indigo-600 hover:underline"
+                className="text-indigo-600 hover:underline inline-flex items-center gap-1"
               >
-                tableau de bord Vercel Analytics
+                tableau de bord Vercel Analytics <ExternalLink size={12} />
               </a>
               .
             </p>
-          </div>
-
-          {/* Users table */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Liste des utilisateurs</h3>
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Nom</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Email</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Rôle</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">
-                      Dernière activité
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {users.map(user => (
-                    <tr key={user.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2.5 font-medium text-slate-800">{user.name}</td>
-                      <td className="px-4 py-2.5 text-slate-600">{user.email}</td>
-                      <td className="px-4 py-2.5">
-                        {user.isAdmin ? (
-                          <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                            <Shield size={10} />
-                            Admin
-                          </span>
-                        ) : (
-                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                            Utilisateur
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-500">
-                        {formatDate(user.lastActiveAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Key, Check, AlertCircle } from 'lucide-react';
 import { useStore } from '../store';
-import { useAuthStore } from '../authStore';
+import { useAuthCompat } from '../useAuthCompat';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { aiConfig, assessmentConfig, setAIConfig, setAssessmentConfig } = useStore();
-  const { saveApiConfig } = useAuthStore();
+  const { saveApiConfig } = useAuthCompat();
   const [provider, setProvider] = React.useState(aiConfig.provider);
   const [apiKey, setApiKey] = React.useState(aiConfig.apiKey);
   const [model, setModel] = React.useState(aiConfig.model);

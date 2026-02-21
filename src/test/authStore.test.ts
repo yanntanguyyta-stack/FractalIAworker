@@ -1,165 +1,177 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useAuthStore } from '../authStore';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock crypto.subtle.digest for test environment
-const mockDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
-Object.defineProperty(global, 'crypto', {
-  value: { subtle: { digest: mockDigest } },
-  writable: true,
-});
+/**
+ * Tests pour le hook useAuthCompat qui bridge Clerk vers l'interface historique.
+ * On ne teste pas la logique Clerk elle-même (c'est leur responsabilité).
+ * On vérifie que le mapping des données Clerk vers UserProfile est correct.
+ */
 
-// Helper: unique email per test to avoid state bleed
-let emailCounter = 0;
-function uniqueEmail() {
-  return `user${++emailCounter}@test.com`;
-}
+// Setup mocks for Clerk hooks
+const mockUserUpdate = vi.fn().mockResolvedValue({});
+const mockSignOut = vi.fn();
+
+let mockUser: Record<string, unknown> | null = null;
+let mockIsSignedIn = false;
+
+vi.mock('@clerk/clerk-react', () => ({
+  useUser: () => ({
+    user: mockUser,
+    isLoaded: true,
+  }),
+  useAuth: () => ({
+    isSignedIn: mockIsSignedIn,
+    isLoaded: true,
+  }),
+  useClerk: () => ({
+    signOut: mockSignOut,
+  }),
+}));
+
+// We need renderHook from testing-library
+import { renderHook, act } from '@testing-library/react';
+import { useAuthCompat } from '../useAuthCompat';
 
 beforeEach(() => {
-  useAuthStore.setState({ currentUser: null, users: [] });
+  mockUser = null;
+  mockIsSignedIn = false;
   vi.clearAllMocks();
-  // Return a stable hash based on the first byte of the mock data
-  mockDigest.mockResolvedValue(new Uint8Array(32).fill(0xab).buffer);
 });
 
-describe('useAuthStore — register', () => {
-  it('devrait créer un compte avec des données valides', async () => {
-    const result = await useAuthStore.getState().register(uniqueEmail(), 'Alice', 'password123');
-    expect(result.success).toBe(true);
-    expect(useAuthStore.getState().currentUser).not.toBeNull();
-    expect(useAuthStore.getState().currentUser?.name).toBe('Alice');
+describe('useAuthCompat — currentUser mapping', () => {
+  it('devrait retourner null quand l\'utilisateur n\'est pas connecté', () => {
+    const { result } = renderHook(() => useAuthCompat());
+    expect(result.current.currentUser).toBeNull();
   });
 
-  it('devrait définir le premier utilisateur comme admin', async () => {
-    await useAuthStore.getState().register(uniqueEmail(), 'Admin', 'password123');
-    expect(useAuthStore.getState().currentUser?.isAdmin).toBe(true);
+  it('devrait mapper un utilisateur Clerk vers UserProfile', () => {
+    mockIsSignedIn = true;
+    mockUser = {
+      id: 'user_123',
+      primaryEmailAddress: { emailAddress: 'alice@test.com' },
+      fullName: 'Alice Martin',
+      firstName: 'Alice',
+      publicMetadata: { role: 'admin' },
+      unsafeMetadata: { aiConfig: { apiKey: 'test-key', provider: 'openai' } },
+      createdAt: new Date('2025-01-01').toISOString(),
+      lastActiveAt: new Date('2025-06-15').toISOString(),
+      update: mockUserUpdate,
+    };
+
+    const { result } = renderHook(() => useAuthCompat());
+    const user = result.current.currentUser;
+    expect(user).not.toBeNull();
+    expect(user!.id).toBe('user_123');
+    expect(user!.email).toBe('alice@test.com');
+    expect(user!.name).toBe('Alice Martin');
+    expect(user!.isAdmin).toBe(true);
+    expect(user!.savedApiConfig?.apiKey).toBe('test-key');
   });
 
-  it('devrait définir les utilisateurs suivants comme non-admin', async () => {
-    await useAuthStore.getState().register(uniqueEmail(), 'User1', 'password123');
-    await useAuthStore.getState().logout();
-    await useAuthStore.getState().register(uniqueEmail(), 'User2', 'password123');
-    expect(useAuthStore.getState().currentUser?.isAdmin).toBe(false);
+  it('devrait retourner isAdmin false si le rôle n\'est pas admin', () => {
+    mockIsSignedIn = true;
+    mockUser = {
+      id: 'user_456',
+      primaryEmailAddress: { emailAddress: 'bob@test.com' },
+      fullName: 'Bob',
+      firstName: 'Bob',
+      publicMetadata: {},
+      unsafeMetadata: {},
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      update: mockUserUpdate,
+    };
+
+    const { result } = renderHook(() => useAuthCompat());
+    expect(result.current.currentUser!.isAdmin).toBe(false);
   });
 
-  it('devrait rejeter si le mot de passe est trop court', async () => {
-    const result = await useAuthStore.getState().register(uniqueEmail(), 'Alice', '12345');
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('6 caractères');
-  });
+  it('devrait utiliser firstName si fullName est absent', () => {
+    mockIsSignedIn = true;
+    mockUser = {
+      id: 'user_789',
+      primaryEmailAddress: { emailAddress: 'charlie@test.com' },
+      fullName: null,
+      firstName: 'Charlie',
+      publicMetadata: {},
+      unsafeMetadata: {},
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      update: mockUserUpdate,
+    };
 
-  it('devrait rejeter si l\'email est invalide', async () => {
-    const result = await useAuthStore.getState().register('not-an-email', 'Alice', 'password123');
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('email');
-  });
-
-  it('devrait rejeter si un champ est manquant', async () => {
-    const result = await useAuthStore.getState().register('', 'Alice', 'password123');
-    expect(result.success).toBe(false);
-  });
-
-  it('devrait rejeter si l\'email est déjà utilisé', async () => {
-    const email = uniqueEmail();
-    await useAuthStore.getState().register(email, 'Alice', 'password123');
-    useAuthStore.setState({ currentUser: null });
-    const result = await useAuthStore.getState().register(email, 'Bob', 'password456');
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('déjà utilisé');
-  });
-
-  it('devrait normaliser l\'email en minuscules', async () => {
-    await useAuthStore.getState().register('ALICE@TEST.COM', 'Alice', 'password123');
-    expect(useAuthStore.getState().currentUser?.email).toBe('alice@test.com');
-  });
-});
-
-describe('useAuthStore — login', () => {
-  it('devrait connecter un utilisateur avec les bons identifiants', async () => {
-    const email = uniqueEmail();
-    // Use a distinct hash for register vs login by using the same mock
-    await useAuthStore.getState().register(email, 'Alice', 'password123');
-    useAuthStore.setState({ currentUser: null });
-
-    const result = await useAuthStore.getState().login(email, 'password123');
-    expect(result.success).toBe(true);
-    expect(useAuthStore.getState().currentUser?.email).toBe(email);
-  });
-
-  it('devrait refuser avec un email inconnu', async () => {
-    const result = await useAuthStore.getState().login('unknown@test.com', 'password123');
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('incorrect');
-  });
-
-  it('devrait refuser avec un mauvais mot de passe', async () => {
-    const email = uniqueEmail();
-    // First register with hash 0xab...
-    await useAuthStore.getState().register(email, 'Alice', 'password123');
-    useAuthStore.setState({ currentUser: null });
-
-    // Login with different hash to simulate wrong password
-    mockDigest.mockResolvedValueOnce(new Uint8Array(32).fill(0xcc).buffer);
-    const result = await useAuthStore.getState().login(email, 'wrongpassword');
-    expect(result.success).toBe(false);
-  });
-
-  it('devrait mettre à jour lastActiveAt lors de la connexion', async () => {
-    const before = Date.now();
-    const email = uniqueEmail();
-    await useAuthStore.getState().register(email, 'Alice', 'password123');
-    useAuthStore.setState({ currentUser: null });
-    await useAuthStore.getState().login(email, 'password123');
-    expect(useAuthStore.getState().currentUser?.lastActiveAt).toBeGreaterThanOrEqual(before);
+    const { result } = renderHook(() => useAuthCompat());
+    expect(result.current.currentUser!.name).toBe('Charlie');
   });
 });
 
-describe('useAuthStore — logout', () => {
-  it('devrait déconnecter l\'utilisateur', async () => {
-    await useAuthStore.getState().register(uniqueEmail(), 'Alice', 'password123');
-    expect(useAuthStore.getState().currentUser).not.toBeNull();
-    useAuthStore.getState().logout();
-    expect(useAuthStore.getState().currentUser).toBeNull();
+describe('useAuthCompat — logout', () => {
+  it('devrait appeler clerk.signOut()', () => {
+    mockIsSignedIn = true;
+    mockUser = {
+      id: 'user_123',
+      primaryEmailAddress: { emailAddress: 'alice@test.com' },
+      fullName: 'Alice',
+      firstName: 'Alice',
+      publicMetadata: {},
+      unsafeMetadata: {},
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      update: mockUserUpdate,
+    };
+
+    const { result } = renderHook(() => useAuthCompat());
+    result.current.logout();
+    expect(mockSignOut).toHaveBeenCalled();
   });
 });
 
-describe('useAuthStore — saveApiConfig', () => {
-  it('devrait sauvegarder la config API de l\'utilisateur', async () => {
-    await useAuthStore.getState().register(uniqueEmail(), 'Alice', 'password123');
-    useAuthStore.getState().saveApiConfig({ apiKey: 'my-key', provider: 'openai' });
-    expect(useAuthStore.getState().currentUser?.savedApiConfig?.apiKey).toBe('my-key');
-    expect(useAuthStore.getState().currentUser?.savedApiConfig?.provider).toBe('openai');
-  });
+describe('useAuthCompat — saveApiConfig', () => {
+  it('devrait appeler user.update avec unsafeMetadata', async () => {
+    mockIsSignedIn = true;
+    mockUser = {
+      id: 'user_123',
+      primaryEmailAddress: { emailAddress: 'alice@test.com' },
+      fullName: 'Alice',
+      firstName: 'Alice',
+      publicMetadata: {},
+      unsafeMetadata: { aiConfig: { provider: 'gemini' } },
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      update: mockUserUpdate,
+    };
 
-  it('ne devrait pas planter si aucun utilisateur connecté', () => {
-    expect(() => {
-      useAuthStore.getState().saveApiConfig({ apiKey: 'test' });
-    }).not.toThrow();
-  });
-});
+    const { result } = renderHook(() => useAuthCompat());
+    await act(async () => {
+      await result.current.saveApiConfig({ apiKey: 'new-key', model: 'gpt-4o' });
+    });
 
-describe('useAuthStore — getAllUsers', () => {
-  it('devrait retourner tous les utilisateurs sans les mots de passe', async () => {
-    await useAuthStore.getState().register(uniqueEmail(), 'Alice', 'password123');
-    const users = useAuthStore.getState().getAllUsers();
-    expect(users.length).toBeGreaterThan(0);
-    users.forEach(u => {
-      expect(u).not.toHaveProperty('passwordHash');
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      unsafeMetadata: {
+        aiConfig: { provider: 'gemini', apiKey: 'new-key', model: 'gpt-4o' },
+      },
     });
   });
+
+  it('ne devrait pas planter si aucun utilisateur connecté', async () => {
+    const { result } = renderHook(() => useAuthCompat());
+    await expect(
+      act(async () => {
+        await result.current.saveApiConfig({ apiKey: 'test' });
+      })
+    ).resolves.not.toThrow();
+  });
 });
 
-describe('useAuthStore — updateLastActive', () => {
-  it('devrait mettre à jour lastActiveAt', async () => {
-    await useAuthStore.getState().register(uniqueEmail(), 'Alice', 'password123');
-    const before = useAuthStore.getState().currentUser!.lastActiveAt;
-    await new Promise(r => setTimeout(r, 10));
-    useAuthStore.getState().updateLastActive();
-    expect(useAuthStore.getState().currentUser!.lastActiveAt).toBeGreaterThanOrEqual(before);
+describe('useAuthCompat — updateLastActive', () => {
+  it('devrait être un no-op sans erreur', () => {
+    const { result } = renderHook(() => useAuthCompat());
+    expect(() => result.current.updateLastActive()).not.toThrow();
   });
+});
 
-  it('ne devrait pas planter si aucun utilisateur connecté', () => {
-    expect(() => {
-      useAuthStore.getState().updateLastActive();
-    }).not.toThrow();
+describe('useAuthCompat — isLoaded', () => {
+  it('devrait exposer isLoaded', () => {
+    const { result } = renderHook(() => useAuthCompat());
+    expect(result.current.isLoaded).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useStore } from '../store';
-import { useAuthStore } from '../authStore';
+import { useAuthCompat } from '../useAuthCompat';
 import { INITIAL_MARKDOWN } from '../mockData';
 import Sidebar from './Sidebar';
 import EditorPane from './EditorPane';
@@ -21,7 +21,7 @@ interface AppProps {
 
 const App: React.FC<AppProps> = ({ className = '' }) => {
   const { loadMarkdown, loadTree, tree, saveToMarkdown, aiConfig, setAIConfig, undo, redo, canUndo, canRedo } = useStore();
-  const { currentUser, logout, saveApiConfig, updateLastActive } = useAuthStore();
+  const { currentUser, logout, saveApiConfig, updateLastActive } = useAuthCompat();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newDocWizardOpen, setNewDocWizardOpen] = useState(false);

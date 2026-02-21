@@ -1,3 +1,7 @@
+/**
+ * @deprecated Ce fichier a été remplacé par src/useAuthCompat.ts qui utilise Clerk.
+ * Conservé temporairement pour référence — à supprimer après validation complète.
+ */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AIConfig } from './store';
