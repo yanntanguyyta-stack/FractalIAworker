@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, FileText, Pencil, ChevronUp as LevelUp, ChevronDown as LevelDown, MoreHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, FileText, Pencil, ChevronUp as LevelUp, ChevronDown as LevelDown, MoreHorizontal, Sparkles } from 'lucide-react';
 import { useStore, DOCUMENT_ROOT_ID } from '../store';
 import { NodeData } from '../types';
 
@@ -99,8 +99,28 @@ function highlightMatch(text: string, term: string) {
   );
 }
 
+// Règles de détection d'incomplétude
+const PLACEHOLDER_PATTERNS = [
+  /\btodo\b/i,
+  /\bà compléter\b/i,
+  /\btbd\b/i,
+  /\bwip\b/i,
+  /\ben cours\b/i,
+  /\bà rédiger\b/i,
+  /\bà définir\b/i,
+];
+const MIN_CONTENT_LENGTH = 50;
+
+function isNodeIncomplete(node: NodeData): boolean {
+  const content = node.content.trim();
+  if (content === '') return true;
+  if (content.length < MIN_CONTENT_LENGTH) return true;
+  if (PLACEHOLDER_PATTERNS.some(re => re.test(content))) return true;
+  return false;
+}
+
 const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
-  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode, demoteNode, selectDocumentRoot, updateNodeHeading } = useStore();
+  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode, demoteNode, selectDocumentRoot, updateNodeHeading, setPendingAIPrompt } = useStore();
   const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -186,6 +206,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     const isActive = activeNodeId === node.id;
     const colorIndex = Math.min(depth, depthColors.length - 1);
     const isDropTarget = dropTargetId === node.id;
+    const incomplete = isNodeIncomplete(node);
 
     return (
       <div key={node.id} className="select-none sidebar-node-item">
@@ -265,6 +286,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             <span className="flex-1 truncate text-sm font-medium">
               {matchIds.has(node.id) ? highlightMatch(node.heading || '(Sans titre)', trimmedSearch) : node.heading || '(Sans titre)'}
             </span>
+
+            {/* Badge "À compléter" */}
+            {incomplete && (
+              <span
+                className="text-[9px] font-bold px-1 py-0.5 bg-amber-100 text-amber-700 rounded flex-shrink-0"
+                title="Contenu incomplet ou vide"
+              >
+                ✎
+              </span>
+            )}
 
             {/* Indicateurs de type */}
             {node.meta.contextConfig?.isGlobal && (
@@ -396,6 +427,25 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             >
               <Trash2 size={14} />
             </button>
+
+            {/* Proposer un enrichissement IA (visible si nœud incomplet) */}
+            {incomplete && (
+              <>
+                <span className="w-px h-5 bg-slate-300 mx-0.5" />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPendingAIPrompt(
+                      `Ce nœud intitulé "${node.heading}" semble incomplet ou vide. Propose un enrichissement pertinent : développe le contenu, ajoute des détails, des exemples ou des sous-sections adaptées au contexte.`
+                    );
+                  }}
+                  className="p-1.5 hover:bg-amber-200 rounded text-amber-700 tooltip-wrapper flex items-center gap-0.5"
+                  data-tooltip="Proposer un enrichissement IA"
+                >
+                  <Sparkles size={14} />
+                </button>
+              </>
+            )}
           </div>
         )}
 

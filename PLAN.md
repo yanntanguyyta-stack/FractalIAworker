@@ -42,10 +42,10 @@ Fournir un backlog **exécutable par agent** avec :
 - `src/test/Sidebar.test.tsx`
 
 **Tâches agent**
-- [ ] Ajouter un champ de recherche dans la sidebar.
-- [ ] Filtrer sur titre + contenu des nœuds.
-- [ ] Mettre en évidence les correspondances dans la liste.
-- [ ] Conserver la navigation/sélection correcte après filtrage.
+- [x] Ajouter un champ de recherche dans la sidebar.
+- [x] Filtrer sur titre + contenu des nœuds.
+- [x] Mettre en évidence les correspondances dans la liste.
+- [x] Conserver la navigation/sélection correcte après filtrage.
 
 **Critères d’acceptation**
 - Recherche insensible à la casse.
@@ -63,11 +63,11 @@ Fournir un backlog **exécutable par agent** avec :
 - `src/types.ts`
 
 **Tâches agent**
-- [ ] Choisir une lib DnD légère compatible React actuel.
-- [ ] Implémenter déplacement intra-parent (ordre).
-- [ ] Implémenter déplacement inter-parents (changer parent).
-- [ ] Bloquer les drops invalides (cycles, > H6).
-- [ ] Mettre à jour tests store + composants.
+- [x] Choisir une lib DnD légère compatible React actuel.
+- [x] Implémenter déplacement intra-parent (ordre).
+- [x] Implémenter déplacement inter-parents (changer parent).
+- [x] Bloquer les drops invalides (cycles, > H6).
+- [x] Mettre à jour tests store + composants.
 
 **Critères d’acceptation**
 - Reorder et changement de parent fonctionnent (souris minimum).
@@ -84,10 +84,10 @@ Fournir un backlog **exécutable par agent** avec :
 - `src/test/*` ciblés export
 
 **Tâches agent**
-- [ ] Intégrer bibliothèque `docx` (npm).
-- [ ] Mapper titres/listes/paragraphes/tableaux vers le modèle DOCX.
-- [ ] Générer fichier `.docx` téléchargeable.
-- [ ] Conserver export `.doc` existant derrière option legacy (temporaire).
+- [x] Intégrer bibliothèque `docx` (npm).
+- [x] Mapper titres/listes/paragraphes/tableaux vers le modèle DOCX.
+- [x] Générer fichier `.docx` téléchargeable.
+- [x] Conserver export `.doc` existant derrière option legacy (temporaire).
 
 **Critères d’acceptation**
 - Le fichier s’ouvre correctement dans Word/LibreOffice.
@@ -102,10 +102,10 @@ Fournir un backlog **exécutable par agent** avec :
 **But** : mieux organiser une collection croissante de documents.
 
 **Tâches agent**
-- [ ] Ajouter tags sur `DocumentMeta`.
-- [ ] CRUD de tags dans le `DocumentManager`.
-- [ ] Recherche/filtre par nom + tags.
-- [ ] Migration douce des métadonnées existantes.
+- [x] Ajouter tags sur `DocumentMeta`.
+- [x] CRUD de tags dans le `DocumentManager`.
+- [x] Recherche/filtre par nom + tags.
+- [x] Migration douce des métadonnées existantes.
 
 **Critères d’acceptation**
 - Les documents historiques restent lisibles sans migration manuelle.
@@ -117,10 +117,10 @@ Fournir un backlog **exécutable par agent** avec :
 **But** : exporter tous les documents en une archive.
 
 **Tâches agent**
-- [ ] Intégrer `jszip`.
-- [ ] Exporter index + documents en JSON (et assets si présents).
-- [ ] Ajouter import en masse depuis ZIP.
-- [ ] Gérer collisions d’ids/titres à l’import.
+- [x] Intégrer `jszip`.
+- [x] Exporter index + documents en JSON (et assets si présents).
+- [x] Ajouter import en masse depuis ZIP.
+- [x] Gérer collisions d’ids/titres à l’import.
 
 **Critères d’acceptation**
 - Round-trip export→import sans perte de données critiques.
@@ -132,9 +132,9 @@ Fournir un backlog **exécutable par agent** avec :
 **But** : signaler les sections à enrichir.
 
 **Tâches agent**
-- [ ] Définir règles de détection locale (longueur, placeholders, sections vides).
-- [ ] Ajouter badge “À compléter” dans la sidebar.
-- [ ] Ajouter action “Proposer un enrichissement IA”.
+- [x] Définir règles de détection locale (longueur, placeholders, sections vides).
+- [x] Ajouter badge “À compléter” dans la sidebar.
+- [x] Ajouter action “Proposer un enrichissement IA”.
 
 **Critères d’acceptation**
 - Les nœuds détectés sont explicables par règles lisibles.

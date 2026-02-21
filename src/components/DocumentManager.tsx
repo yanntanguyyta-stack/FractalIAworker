@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  FolderOpen, FilePlus, Trash2, Edit3, Copy, X, FileText, Clock, Check, AlertTriangle
+  FolderOpen, FilePlus, Trash2, Edit3, Copy, X, FileText, Clock, Check, AlertTriangle, Tag, Search, Download, Upload
 } from 'lucide-react';
 import {
   DocumentMeta,
   DocumentIndex,
   loadDocumentIndex,
   loadDocumentTree,
+  saveDocumentIndex,
+  saveDocumentTree,
   deleteDocument,
   renameDocument,
   setActiveDocument,
   duplicateDocument,
+  updateDocumentTags,
 } from '../documentStore';
+import { exportDocumentsToZip, importDocumentsFromZip, mergeImportedDocuments } from '../utils/zipExport';
 
 interface DocumentManagerProps {
   isOpen: boolean;
@@ -29,6 +33,13 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tagFilterId, setTagFilterId] = useState<string | null>(null);
+  const [editingTagsId, setEditingTagsId] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState('');
+  const [isExportingZip, setIsExportingZip] = useState(false);
+  const [isImportingZip, setIsImportingZip] = useState(false);
+  const zipInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -72,6 +83,77 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
     }
   };
 
+  const handleSaveTags = (docId: string) => {
+    const tags = tagInput
+      .split(',')
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+    updateDocumentTags(userId, docId, tags);
+    setDocIndex(loadDocumentIndex(userId));
+    setEditingTagsId(null);
+    setTagInput('');
+  };
+
+  const handleRemoveTag = (docId: string, tag: string, currentTags: string[]) => {
+    const updatedTags = currentTags.filter(t => t !== tag);
+    updateDocumentTags(userId, docId, updatedTags);
+    setDocIndex(loadDocumentIndex(userId));
+  };
+
+  const handleExportZip = async () => {
+    if (docIndex.documents.length === 0) return;
+    setIsExportingZip(true);
+    try {
+      const blob = await exportDocumentsToZip(userId, docIndex, loadDocumentTree);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fractalia-documents-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Erreur lors de l\'export ZIP.');
+    } finally {
+      setIsExportingZip(false);
+    }
+  };
+
+  const handleImportZip = async (file: File) => {
+    setIsImportingZip(true);
+    try {
+      const bundle = await importDocumentsFromZip(file);
+      const currentIndex = loadDocumentIndex(userId);
+      const { mergedIndex, mergedDocs } = mergeImportedDocuments(currentIndex, bundle);
+      saveDocumentIndex(userId, mergedIndex);
+      for (const [docId, tree] of Object.entries(mergedDocs)) {
+        saveDocumentTree(userId, docId, tree);
+      }
+      setDocIndex(loadDocumentIndex(userId));
+      alert(`${bundle.index.documents.length} document(s) importé(s) avec succès.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur lors de l\'import ZIP.';
+      alert(`Erreur d'import : ${message}`);
+    } finally {
+      setIsImportingZip(false);
+      if (zipInputRef.current) zipInputRef.current.value = '';
+    }
+  };
+
+  // All unique tags across all documents
+  const allTags = Array.from(
+    new Set(docIndex.documents.flatMap(d => d.tags ?? []))
+  ).sort();
+
+  // Filter documents by search query and active tag filter
+  const lowerQuery = searchQuery.toLowerCase();
+  const filteredDocuments = docIndex.documents.filter(doc => {
+    const matchesName = lowerQuery === '' || doc.name.toLowerCase().includes(lowerQuery);
+    const matchesTag = tagFilterId === null || (doc.tags ?? []).includes(tagFilterId);
+    return matchesName && matchesTag;
+  });
+
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -102,7 +184,7 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
               <div>
                 <h2 className="text-xl font-bold">Mes documents</h2>
                 <p className="text-slate-300 text-sm">
-                  {docIndex.documents.length} document{docIndex.documents.length !== 1 ? 's' : ''}
+                  {filteredDocuments.length}/{docIndex.documents.length} document{docIndex.documents.length !== 1 ? 's' : ''}
                 </p>
               </div>
             </div>
@@ -113,6 +195,45 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
               <X size={20} />
             </button>
           </div>
+          {/* Search bar */}
+          <div className="mt-3 relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par nom..."
+              className="w-full pl-8 pr-3 py-2 bg-white/15 border border-white/20 rounded-lg text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/40"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {/* Tag filters */}
+          {allTags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setTagFilterId(null)}
+                className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tagFilterId === null ? 'bg-white text-indigo-800 font-semibold' : 'bg-white/20 text-white hover:bg-white/30'}`}
+              >
+                Tous
+              </button>
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setTagFilterId(tagFilterId === tag ? null : tag)}
+                  className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tagFilterId === tag ? 'bg-white text-indigo-800 font-semibold' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -130,9 +251,14 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
                 Créer un document
               </button>
             </div>
+          ) : filteredDocuments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+              <Search size={36} className="mb-3 opacity-40" />
+              <p className="text-sm text-gray-500">Aucun document ne correspond à la recherche.</p>
+            </div>
           ) : (
             <div className="space-y-2">
-              {docIndex.documents
+              {filteredDocuments
                 .sort((a, b) => b.updatedAt - a.updatedAt)
                 .map((doc) => (
                   <div
@@ -194,6 +320,44 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
                                   <span className="text-indigo-600 font-medium">• Actif</span>
                                 )}
                               </div>
+                              {/* Tags display */}
+                              {editingTagsId === doc.id ? (
+                                <div className="mt-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                  <input
+                                    type="text"
+                                    value={tagInput}
+                                    onChange={e => setTagInput(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') handleSaveTags(doc.id);
+                                      if (e.key === 'Escape') { setEditingTagsId(null); setTagInput(''); }
+                                    }}
+                                    placeholder="tag1, tag2, ..."
+                                    className="flex-1 px-2 py-1 text-xs border border-indigo-300 rounded focus:ring-1 focus:ring-indigo-400 focus:outline-none"
+                                    autoFocus
+                                  />
+                                  <button onClick={() => handleSaveTags(doc.id)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check size={14} /></button>
+                                  <button onClick={() => { setEditingTagsId(null); setTagInput(''); }} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X size={14} /></button>
+                                </div>
+                              ) : (
+                                <div className="mt-2 flex flex-wrap items-center gap-1">
+                                  {(doc.tags ?? []).map(tag => (
+                                    <span
+                                      key={tag}
+                                      className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full"
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      #{tag}
+                                      <button
+                                        onClick={() => handleRemoveTag(doc.id, tag, doc.tags ?? [])}
+                                        className="hover:text-red-500 transition-colors"
+                                        title="Retirer ce tag"
+                                      >
+                                        <X size={10} />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </>
                           )}
                         </div>
@@ -214,6 +378,16 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
                             title="Renommer"
                           >
                             <Edit3 size={15} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingTagsId(doc.id);
+                              setTagInput((doc.tags ?? []).join(', '));
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                            title="Gérer les tags"
+                          >
+                            <Tag size={15} />
                           </button>
                           <button
                             onClick={() => handleDuplicateDoc(doc.id)}
@@ -266,20 +440,52 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-between">
+        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex flex-wrap items-center justify-between gap-2">
           <button
             onClick={onClose}
             className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
           >
             Fermer
           </button>
-          <button
-            onClick={() => { onClose(); onNewDocument(); }}
-            className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium transition-colors"
-          >
-            <FilePlus size={18} />
-            Nouveau document
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export ZIP */}
+            <button
+              onClick={handleExportZip}
+              disabled={isExportingZip || docIndex.documents.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              title="Exporter tous les documents en ZIP"
+            >
+              <Download size={16} />
+              {isExportingZip ? 'Export...' : 'Export ZIP'}
+            </button>
+            {/* Import ZIP */}
+            <button
+              onClick={() => zipInputRef.current?.click()}
+              disabled={isImportingZip}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              title="Importer des documents depuis un ZIP"
+            >
+              <Upload size={16} />
+              {isImportingZip ? 'Import...' : 'Import ZIP'}
+            </button>
+            <input
+              ref={zipInputRef}
+              type="file"
+              accept=".zip"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) handleImportZip(file);
+              }}
+            />
+            <button
+              onClick={() => { onClose(); onNewDocument(); }}
+              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium transition-colors"
+            >
+              <FilePlus size={18} />
+              Nouveau document
+            </button>
+          </div>
         </div>
       </div>
     </div>

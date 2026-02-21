@@ -40,7 +40,7 @@ const promptTemplates = [
 ];
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
-  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild } = useStore();
+  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild, pendingAIPrompt, setPendingAIPrompt } = useStore();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -48,6 +48,14 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   const [showTemplates, setShowTemplates] = React.useState(false);
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(['discussion', 'content', 'subsections']));
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  // Consume pending AI prompt from sidebar enrichment action
+  React.useEffect(() => {
+    if (pendingAIPrompt) {
+      setInput(pendingAIPrompt);
+      setPendingAIPrompt(null);
+    }
+  }, [pendingAIPrompt, setPendingAIPrompt]);
 
   const toggleSection = (messageIdx: number, section: string) => {
     const key = `${messageIdx}-${section}`;
