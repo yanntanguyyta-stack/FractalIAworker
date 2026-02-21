@@ -19,7 +19,6 @@ import {
   Copy,
   Check,
   ChevronRight,
-  Home,
   RefreshCw,
   FileText,
 } from 'lucide-react';
@@ -60,7 +59,6 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const editablePreviewRef = useRef<HTMLDivElement>(null);
   const prevNodeIdRef = useRef<string | null>(null);
 
   // Animation lors du changement de nœud
@@ -76,7 +74,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   // Render Mermaid diagrams
   useEffect(() => {
     if (viewMode !== 'edit') {
-      const container = previewRef.current || editablePreviewRef.current;
+      const container = previewRef.current;
       if (container) {
         const mermaidDivs = container.querySelectorAll('.mermaid');
         mermaidDivs.forEach(async (div, index) => {
@@ -594,8 +592,22 @@ Utilisez la barre d'outils pour formater votre texte :
 - *Italique* avec *texte*
 - `Code` avec `code`
 - Tableaux et diagrammes Mermaid disponibles !"
-              className="w-full h-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed overflow-y-auto"
+              className="w-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed overflow-y-auto flex-1 min-h-0"
             />
+            {/* Contenu des nœuds enfants — lecture seule */}
+            {activeNode.children.length > 0 && (
+              <div className="flex-1 min-h-0 border-t-2 border-dashed border-indigo-200 overflow-y-auto p-4 bg-gray-50">
+                <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-3">
+                  ↳ Sections enfants
+                </p>
+                <div
+                  className="prose prose-sm max-w-none text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: renderPreview(
+                    activeNode.children.map((child: NodeData) => getNodeFullContent(child.id)).join('\n\n')
+                  ) }}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -623,47 +635,8 @@ Utilisez la barre d'outils pour formater votre texte :
           </>
         )}
 
-        {/* Mode Formatté : nœud actif éditable + enfants en lecture seule */}
-        {!isDocRoot && viewMode === 'preview' && activeNode && (
-          <div
-            ref={editablePreviewRef}
-            className="w-full overflow-y-auto p-4 bg-white"
-          >
-            {/* Contenu du nœud actif — éditable */}
-            <div
-              className="prose prose-sm max-w-none focus:outline-none editable-preview"
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => {
-                // Extraire le texte brut du contentEditable
-                const el = e.currentTarget;
-                const text = el.innerText || '';
-                if (text !== activeNode.content) {
-                  updateNodeContent(activeNode.id, text);
-                }
-              }}
-              dangerouslySetInnerHTML={{ __html: renderPreview(activeNode.content) }}
-            />
-            {/* Contenu des nœuds enfants — lecture seule */}
-            {activeNode.children.length > 0 && (
-              <div className="mt-6 pt-4 border-t-2 border-dashed border-indigo-200">
-                <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-3">
-                  ↳ Sections enfants
-                </p>
-                <div
-                  ref={previewRef}
-                  className="prose prose-sm max-w-none text-gray-700"
-                  dangerouslySetInnerHTML={{ __html: renderPreview(
-                    activeNode.children.map((child: NodeData) => getNodeFullContent(child.id)).join('\n\n')
-                  ) }}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* H0 ou aucun nœud : vue formatée du document complet (lecture seule) */}
-        {(isDocRoot || (!activeNode && !isDocRoot)) && viewMode === 'preview' && (
+        {/* Mode Formatté : contenu complet du sous-arbre (nœud + enfants) en lecture seule */}
+        {viewMode === 'preview' && (
           <div
             ref={previewRef}
             className="w-full overflow-y-auto p-4 bg-white"
