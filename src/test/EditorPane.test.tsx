@@ -72,9 +72,9 @@ Contenu enfant`);
     
     render(<EditorPane />);
     
-    // Les boutons de mode sont Éditer, Split, Aperçu
-    const editButton = screen.getByText('Éditer');
-    const previewButton = screen.getByText('Aperçu');
+    // Les boutons de mode sont Markdown, Split, Formatté
+    const editButton = screen.getByText('Markdown');
+    const previewButton = screen.getByText('Formatté');
     
     expect(editButton).toBeInTheDocument();
     expect(previewButton).toBeInTheDocument();
@@ -422,7 +422,7 @@ Ceci est le contenu simple.`);
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // En mode preview, le textarea ne devrait plus être visible
@@ -441,7 +441,7 @@ Ceci est le contenu simple.`);
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Vérifier que le contenu de la citation est visible
@@ -458,7 +458,7 @@ Ceci est le contenu simple.`);
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Vérifier que les items de liste sont rendus
@@ -475,7 +475,7 @@ Voir ce lien`);
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Vérifier que le contenu est rendu
@@ -492,7 +492,7 @@ Texte normal`);
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Vérifier que le contenu est rendu en preview
@@ -573,7 +573,7 @@ Texte normal`);
     fireEvent.click(splitButton);
     
     // Puis passer en mode édition
-    const editButton = screen.getByText('Éditer');
+    const editButton = screen.getByText('Markdown');
     fireEvent.click(editButton);
     
     // Vérifier qu'on est en mode édition (textarea visible)
@@ -593,7 +593,7 @@ Texte normal`);
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Vérifier que le preview contient une table
@@ -719,7 +719,7 @@ graph TD
     const { container } = render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Le composant devrait avoir le mode préview activé
@@ -744,7 +744,7 @@ graph TD
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Vérifier que le preview est affiché
@@ -780,14 +780,14 @@ Texte`);
     render(<EditorPane />);
     
     // D'abord passer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Le textarea ne devrait pas être visible
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     
     // Revenir en mode edition
-    const editButton = screen.getByText('Éditer');
+    const editButton = screen.getByText('Markdown');
     fireEvent.click(editButton);
     
     // Le textarea devrait être visible
@@ -813,7 +813,7 @@ Texte après`);
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Le preview devrait être affiché
@@ -841,7 +841,7 @@ graph TD
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Le preview devrait exister
@@ -868,7 +868,7 @@ invalid syntax here
     render(<EditorPane />);
     
     // Basculer en mode preview
-    const previewButton = screen.getByText('Aperçu');
+    const previewButton = screen.getByText('Formatté');
     fireEvent.click(previewButton);
     
     // Le preview devrait exister même avec une erreur
