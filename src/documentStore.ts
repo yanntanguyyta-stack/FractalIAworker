@@ -12,6 +12,7 @@ export interface DocumentMeta {
   name: string;
   createdAt: number;
   updatedAt: number;
+  nodeCount?: number;
 }
 
 export interface DocumentIndex {
@@ -94,15 +95,27 @@ export function loadDocumentTree(userId: string, docId: string): NodeData[] | nu
 }
 
 /**
+ * Counts the total number of nodes in a tree recursively
+ */
+function countNodes(tree: NodeData[]): number {
+  let count = tree.length;
+  for (const node of tree) {
+    count += countNodes(node.children);
+  }
+  return count;
+}
+
+/**
  * Sauvegarde l'arbre d'un document
  */
 export function saveDocumentTree(userId: string, docId: string, tree: NodeData[]): void {
   localStorage.setItem(getDocKey(userId, docId), JSON.stringify(tree));
-  // Mettre à jour updatedAt dans l'index
+  // Mettre à jour updatedAt et nodeCount dans l'index
   const index = loadDocumentIndex(userId);
   const doc = index.documents.find(d => d.id === docId);
   if (doc) {
     doc.updatedAt = Date.now();
+    doc.nodeCount = countNodes(tree);
     saveDocumentIndex(userId, index);
   }
 }
@@ -114,7 +127,7 @@ export function createDocument(userId: string, name: string, tree: NodeData[]): 
   const docId = generateDocId();
   const now = Date.now();
   const index = loadDocumentIndex(userId);
-  index.documents.push({ id: docId, name, createdAt: now, updatedAt: now });
+  index.documents.push({ id: docId, name, createdAt: now, updatedAt: now, nodeCount: countNodes(tree) });
   index.activeDocId = docId;
   saveDocumentIndex(userId, index);
   localStorage.setItem(getDocKey(userId, docId), JSON.stringify(tree));
