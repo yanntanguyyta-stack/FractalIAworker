@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Sparkles, Check, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { FileText, Sparkles, Check, ChevronRight, Loader2, RefreshCw, Settings } from 'lucide-react';
 import { useStore } from '../store';
 import { callAIAPI } from '../aiService';
 
@@ -16,9 +16,11 @@ interface DocumentPlan {
 interface NewDocumentWizardProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenSettings?: () => void;
+  onDocumentCreated?: (title: string) => void;
 }
 
-const NewDocumentWizard: React.FC<NewDocumentWizardProps> = ({ isOpen, onClose }) => {
+const NewDocumentWizard: React.FC<NewDocumentWizardProps> = ({ isOpen, onClose, onOpenSettings, onDocumentCreated }) => {
   const { aiConfig, loadMarkdown } = useStore();
   const [step, setStep] = React.useState<'input' | 'loading' | 'review' | 'creating'>('input');
   const [documentType, setDocumentType] = React.useState('');
@@ -34,9 +36,14 @@ const NewDocumentWizard: React.FC<NewDocumentWizardProps> = ({ isOpen, onClose }
     { icon: '🎓', label: 'Cours/Formation', prompt: 'Un cours ou une formation en ligne' },
   ];
 
+  const handleOpenSettings = () => {
+    onClose();
+    onOpenSettings?.();
+  };
+
   const generatePlan = async (prompt: string) => {
     if (!aiConfig.apiKey) {
-      setError('Veuillez d\'abord configurer votre clé API dans les paramètres.');
+      setError('API_KEY_MISSING');
       return;
     }
 
@@ -113,6 +120,9 @@ Propose-moi un plan structuré pour ce document.`;
     // Charger le nouveau document
     loadMarkdown(markdown);
 
+    // Notifier la création du document
+    onDocumentCreated?.(plan.title);
+
     // Fermer le wizard
     setTimeout(() => {
       onClose();
@@ -175,6 +185,38 @@ Propose-moi un plan structuré pour ce document.`;
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Error display - always at top */}
+          {error && step === 'input' && (
+            error === 'API_KEY_MISSING' ? (
+              <div className="mb-6 p-4 bg-amber-50 border-2 border-amber-300 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 rounded-lg shrink-0">
+                    <Settings size={20} className="text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-amber-800">Clé API non configurée</h4>
+                    <p className="text-sm text-amber-700 mt-1">
+                      Pour générer un plan avec l'IA, vous devez d'abord configurer votre clé API (OpenAI ou Gemini) dans les paramètres.
+                    </p>
+                    {onOpenSettings && (
+                      <button
+                        onClick={handleOpenSettings}
+                        className="mt-3 flex items-center gap-2 px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <Settings size={16} />
+                        Ouvrir les paramètres IA
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                {error}
+              </div>
+            )
+          )}
+
           {/* Step 1: Input */}
           {step === 'input' && (
             <div className="space-y-6">
@@ -208,12 +250,6 @@ Propose-moi un plan structuré pour ce document.`;
                   ))}
                 </div>
               </div>
-
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                  {error}
-                </div>
-              )}
             </div>
           )}
 

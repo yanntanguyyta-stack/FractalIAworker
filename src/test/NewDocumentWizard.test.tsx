@@ -84,7 +84,7 @@ describe('NewDocumentWizard', () => {
     fireEvent.click(generateButton);
     
     await waitFor(() => {
-      expect(screen.getByText(/clé API/i)).toBeInTheDocument();
+      expect(screen.getByText(/Clé API non configurée/i)).toBeInTheDocument();
     });
   });
 

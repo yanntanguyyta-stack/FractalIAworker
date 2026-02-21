@@ -10,8 +10,16 @@ import NewDocumentWizard from './NewDocumentWizard';
 import OnboardingWizard from './OnboardingWizard';
 import ImportWizard from './ImportWizard';
 import AdminDashboard from './AdminDashboard';
-import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User } from 'lucide-react';
+import DocumentManager from './DocumentManager';
+import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User, FolderOpen } from 'lucide-react';
 import { buildHtmlDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
+import {
+  loadDocumentIndex,
+  loadDocumentTree,
+  saveDocumentTree,
+  createDocument as createDocEntry,
+  setActiveDocument,
+} from '../documentStore';
 
 const ONBOARDING_COMPLETED_KEY = 'fractalia_onboarding_completed';
 
@@ -34,6 +42,8 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     return !localStorage.getItem(ONBOARDING_COMPLETED_KEY);
   });
   const [importWizardOpen, setImportWizardOpen] = useState(false);
+  const [docManagerOpen, setDocManagerOpen] = useState(false);
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
 
   const handleCloseOnboarding = useCallback(() => {
     setOnboardingOpen(false);
@@ -61,33 +71,63 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     }
 
     if (currentUser) {
-      // Restaurer les documents sauvegardés de l'utilisateur
-      try {
-        const savedDocs = localStorage.getItem(`fractalia-docs-${currentUser.id}`);
-        if (savedDocs) {
-          const parsedTree = JSON.parse(savedDocs);
-          loadTree(parsedTree);
-          return;
-        }
-      } catch {
-        // Continuer avec les données mock si la restauration échoue
-      }
-
       // Charger la configuration IA sauvegardée de l'utilisateur
       if (currentUser.savedApiConfig) {
         setAIConfig({ ...aiConfig, ...currentUser.savedApiConfig });
       }
+
+      // Charger les documents via le nouveau document store
+      const index = loadDocumentIndex(currentUser.id);
+      if (index.activeDocId && index.documents.length > 0) {
+        const docTree = loadDocumentTree(currentUser.id, index.activeDocId);
+        if (docTree) {
+          setActiveDocId(index.activeDocId);
+          loadTree(docTree);
+          return;
+        }
+      }
     }
 
     loadMarkdown(INITIAL_MARKDOWN);
+    // Créer un premier document pour les nouveaux utilisateurs
+    if (currentUser) {
+      setTimeout(() => {
+        const currentTree = useStore.getState().tree;
+        const docId = createDocEntry(currentUser.id, 'Bienvenue - Démo', currentTree);
+        setActiveDocId(docId);
+      }, 100);
+    }
   }, [currentUser?.id]);
 
   // Sauvegarde automatique des documents par utilisateur
   useEffect(() => {
-    if (currentUser && tree.length > 0) {
-      localStorage.setItem(`fractalia-docs-${currentUser.id}`, JSON.stringify(tree));
+    if (currentUser && tree.length > 0 && activeDocId) {
+      saveDocumentTree(currentUser.id, activeDocId, tree);
     }
-  }, [tree, currentUser?.id]);
+  }, [tree, currentUser?.id, activeDocId]);
+
+  // Ouvrir un document existant par ID
+  const handleOpenDocument = useCallback((docId: string) => {
+    if (!currentUser) return;
+    const docTree = loadDocumentTree(currentUser.id, docId);
+    if (docTree) {
+      setActiveDocId(docId);
+      setActiveDocument(currentUser.id, docId);
+      loadTree(docTree);
+    }
+  }, [currentUser, loadTree]);
+
+  // Callback après création d'un document via le wizard
+  const handleDocumentCreated = useCallback((title: string) => {
+    if (!currentUser) return;
+    // Le wizard a déjà appelé loadMarkdown, tree est à jour après le prochain render
+    // On crée l'entrée dans l'index après un tick pour avoir le tree mis à jour
+    setTimeout(() => {
+      const currentTree = useStore.getState().tree;
+      const docId = createDocEntry(currentUser.id, title, currentTree);
+      setActiveDocId(docId);
+    }, 600); // après la fermeture du wizard (500ms timeout dans wizard)
+  }, [currentUser]);
 
   // Mise à jour de l'activité utilisateur
   useEffect(() => {
@@ -318,6 +358,15 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
           <div className="flex gap-3">
             <button
+              onClick={() => setDocManagerOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
+              title="Gérer mes documents"
+            >
+              <FolderOpen size={18} />
+              Mes documents
+            </button>
+
+            <button
               onClick={() => setNewDocWizardOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-xl font-medium transition-colors shadow-sm"
               title="Créer un nouveau document avec l'IA"
@@ -539,7 +588,12 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Wizard Nouveau Document */}
-      <NewDocumentWizard isOpen={newDocWizardOpen} onClose={() => setNewDocWizardOpen(false)} />
+      <NewDocumentWizard 
+        isOpen={newDocWizardOpen} 
+        onClose={() => setNewDocWizardOpen(false)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onDocumentCreated={handleDocumentCreated}
+      />
 
       {/* Onboarding pour les nouveaux utilisateurs */}
       <OnboardingWizard 
@@ -556,6 +610,16 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
       {/* Tableau de bord Admin */}
       <AdminDashboard isOpen={adminOpen} onClose={() => setAdminOpen(false)} />
+
+      {/* Gestionnaire de documents */}
+      <DocumentManager
+        isOpen={docManagerOpen}
+        onClose={() => setDocManagerOpen(false)}
+        userId={currentUser?.id || ''}
+        activeDocId={activeDocId}
+        onOpenDocument={handleOpenDocument}
+        onNewDocument={() => setNewDocWizardOpen(true)}
+      />
     </div>
   );
 };
