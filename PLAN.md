@@ -136,73 +136,105 @@ Permettre l'importation de fichiers externes avec analyse IA automatique de la s
 
 ---
 
-## 🔲 Phase 5 : Fonctionnalités avancées (FUTUR)
+## ✅ Phase 5 : Dashboard documents & Exports (TERMINÉ)
 
-### 5.2 Collaboration et export
-- [ ] Export en PDF
-- [ ] Export en HTML standalone
-- [ ] Export en DOCX (optionnel)
-- [ ] Partage de document via lien (nécessite backend)
+### 5.1 Dashboard de gestion des documents
+**Réalisations** :
+- [x] `DocumentManager` : modal listant tous les documents de l'utilisateur
+- [x] Tri par date de dernière modification
+- [x] Affichage du nombre de nœuds et des dates de création / modification
+- [x] Renommer un document (édition inline + touche Entrée)
+- [x] Dupliquer un document
+- [x] Supprimer un document avec confirmation
+- [x] Bouton "Mes documents" dans la barre de navigation
 
-### 5.3 Gestion des nœuds
-- [ ] Drag & Drop pour réorganiser les nœuds
-- [ ] Copier/Coller des nœuds
-- [ ] Recherche dans tous les nœuds
-- [ ] Filtrage par type de nœud
-
-### 5.4 IA avancée
-- [ ] Génération automatique de todo-list depuis le contenu
-- [ ] Détection de sections incomplètes
-- [ ] Suggestions proactives de l'IA
-- [ ] Traduction de sections
-
-### 5.5 Tests et qualité
-**Objectif** : Assurer une couverture de tests suffisante pour garantir la stabilité et la maintenabilité du projet.
-
-- [ ] Mise en place de l'infrastructure de tests (Vitest + React Testing Library)
-- [ ] Tests unitaires des fonctions utilitaires (store, aiService, markdownEngine)
-- [ ] Tests de composants React (Sidebar, EditorPane, ChatPane, etc.)
-- [ ] Tests d'intégration des flux utilisateur principaux
-- [ ] Configuration du rapport de couverture de code
-- [ ] Objectif : couverture minimale de 70%
-
-### 5.6 Parcours d'onboarding
-**Objectif** : Guider les nouveaux utilisateurs à travers les fonctionnalités de l'application.
-
-- [ ] Bouton "Présentation" accessible depuis l'interface principale
-- [ ] Tour guidé interactif des fonctionnalités principales
-- [ ] Mise en évidence des éléments UI avec explications contextuelles
-- [ ] Étapes du parcours : Sidebar → Éditeur → Chat IA → Modes de vue → Toolbar
-- [ ] Option de ne plus afficher au démarrage (localStorage)
-- [ ] Possibilité de relancer le tour à tout moment
-
-### 5.7 Gestion multi-documents
-**Objectif** : Permettre la gestion de plusieurs documents avec import/export en masse.
-
-- [ ] Interface de gestion de bibliothèque de documents
-- [ ] Liste des documents avec métadonnées (titre, date, taille)
-- [ ] Création, suppression et sélection de documents
-- [ ] Export de tous les documents en un seul fichier (ZIP ou JSON)
-- [ ] Import en masse depuis un fichier d'archive
-- [ ] Persistance des documents dans localStorage ou IndexedDB
-- [ ] Gestion des conflits lors de l'import
+### 5.2 Exports professionnels
+**Réalisations** :
+- [x] **Export Markdown** : fichier `.md` brut, fidèle au contenu
+- [x] **Export HTML** : document HTML autonome avec CSS intégré, sans dépendance externe (Tailwind supprimé), rendu correct des tableaux, listes imbriquées, blocs de code
+- [x] **Export PDF** : utilise `buildPrintHtmlDocument` avec :
+  - `@page { size: A4; margin: 2.5cm 2cm 2.5cm 2.5cm; }` pour les marges d'impression
+  - Saut de page automatique avant chaque `<h1>` (sauf le premier)
+  - `page-break-after: avoid` sur les titres (h2–h6) pour éviter les ruptures orphelines
+  - `page-break-inside: avoid` sur les blocs de code, citations et tableaux
+  - Règles orphans/widows (3 lignes minimum) pour les paragraphes
+  - URLs affichées entre parenthèses après les liens en impression
+- [x] **Export Word (.doc)** : HTML compatible Microsoft Word avec espaces de noms Office, styles `mso-*`, et définition de la section de page Word (21×29,7 cm, marges 2,5/2 cm)
+- [x] Conversion Markdown→HTML robuste : gestion des tableaux en `<table>` réelle, blocs `<pre><code>`, listes `<ul>`/`<ol>`, titres h1–h6, citations, HR
 
 ---
 
-## Priorités immédiates
+## 🔲 Phase 6 : Fonctionnalités avancées (FUTUR)
 
-1. **Phase 3.1** - Scroll (rapide à implémenter)
-2. **Phase 3.2** - Panneaux redimensionnables (amélioration UX majeure)
-3. **Phase 4.1** - Mode Rédaction vs Discussion (qualité du contenu généré)
+### 6.1 Export avancé
+- [ ] **Export DOCX natif** via la bibliothèque `docx` (npm) pour générer des fichiers `.docx` réels (avec styles, numérotation, images)
+- [ ] **Export ODT** pour LibreOffice (format ouvert)
+- [ ] **Export ePub** pour les longs documents (romans, documentations)
+- [ ] **Aperçu d'impression intégré** dans l'application avant export PDF
+- [ ] **En-têtes et pieds de page** personnalisables pour PDF (titre, numéro de page, date)
+- [ ] **Table des matières** auto-générée en début de document exporté
+
+### 6.2 Gestion des nœuds
+- [ ] **Drag & Drop** pour réorganiser les nœuds dans la sidebar
+- [ ] **Recherche globale** dans tous les nœuds (titre + contenu)
+- [ ] **Filtrage** par niveau de profondeur ou type de nœud
+- [ ] **Statistiques de document** : nombre de mots, temps de lecture estimé
+- [ ] **Export partiel** : exporter uniquement le nœud actif et ses enfants
+
+### 6.3 Dashboard documents amélioré
+- [ ] **Vue grille / liste** commutable dans le DocumentManager
+- [ ] **Aperçu rapide** au survol d'un document (tooltip avec les 3 premiers nœuds)
+- [ ] **Étiquettes / tags** pour organiser les documents
+- [ ] **Recherche** parmi les documents par titre
+- [ ] **Export de tous les documents** dans un fichier ZIP (JSON + assets)
+- [ ] **Import en masse** depuis une archive ZIP
+- [ ] **Synchronisation cloud optionnelle** (ex. : Firebase, Supabase) pour accès multi-appareils
+
+### 6.4 IA avancée
+- [ ] **Génération automatique de plan** : l'IA propose une structure complète à partir d'un titre
+- [ ] **Détection de sections incomplètes** : score de complétude visible dans la sidebar
+- [ ] **Suggestions proactives** : l'IA propose du contenu sans qu'on lui demande
+- [ ] **Traduction de sections** : traduire un nœud sélectionné dans une autre langue
+- [ ] **Résumé automatique** d'un nœud ou du document entier
+- [ ] **Détection de doublons** entre nœuds (contenu proche)
+
+### 6.5 Collaboration
+- [ ] **Partage via lien court** (nécessite un backend / service de raccourcissement)
+- [ ] **Commentaires par nœud** (annotations non intégrées au contenu)
+- [ ] **Historique des révisions** visible par l'utilisateur (au-delà du undo/redo en mémoire)
+- [ ] **Export vers Notion / Confluence** via API
+
+### 6.6 Performance et qualité
+- [ ] **Couverture de tests** : atteindre 70 % avec Vitest + React Testing Library
+- [ ] **Virtualisation** de la sidebar pour les documents avec > 200 nœuds
+- [ ] **Persistance via IndexedDB** (remplacement localStorage pour les grands documents)
+- [ ] **Mode hors ligne** (PWA) : service worker pour mise en cache de l'application
+- [ ] **Mode sombre** complet
+
+---
+
+## Priorités recommandées (prochaine phase)
+
+1. **6.1 Export DOCX natif** — fort impact utilisateur, fiabilité maximale
+2. **6.3 Tags & recherche documents** — améliore l'organisation dès que la bibliothèque grandit
+3. **6.2 Drag & Drop nœuds** — très attendu pour la restructuration de documents complexes
+4. **6.4 Génération de plan IA** — différenciateur fort par rapport aux éditeurs classiques
 
 ---
 
 ## Notes techniques
 
-### Librairies suggérées pour Phase 3.2
-- `react-resizable-panels` : léger, bien maintenu
-- `allotment` : plus de fonctionnalités, style VS Code
-- `react-split` : simple mais moins de features
+### Librairies suggérées pour la phase 6
+- `docx` (npm) : génération de vrais fichiers `.docx` sans Word
+- `jszip` (npm) : création d'archives ZIP pour export en masse
+- `idb` ou `dexie` : accès IndexedDB plus ergonomique
+- `fuse.js` : recherche floue dans les nœuds et documents
+- `react-dnd` ou `@dnd-kit/core` : drag & drop des nœuds dans la sidebar
+
+### Architecture de l'export (phase 6.1)
+L'export DOCX natif devra passer par un pipeline :
+`NodeData[] → Markdown → AST remark → docx.js Document`
+Il est recommandé de créer un module `src/utils/docxExport.ts` dédié pour séparer la logique d'export.
 
 ### Structure des instructions IA (Phase 4)
 Les instructions doivent être injectées dans `buildSystemPrompt()` de `aiService.ts` selon le mode choisi.

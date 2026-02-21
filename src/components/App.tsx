@@ -12,7 +12,7 @@ import ImportWizard from './ImportWizard';
 import AdminDashboard from './AdminDashboard';
 import DocumentManager from './DocumentManager';
 import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User, FolderOpen } from 'lucide-react';
-import { buildHtmlDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
+import { buildHtmlDocument, buildPrintHtmlDocument, buildWordDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
 import {
   loadDocumentIndex,
   loadDocumentTree,
@@ -236,20 +236,20 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
   const handleExportDocx = () => {
     const markdown = saveToMarkdown();
-    const html = buildHtmlDocument(markdown, getExportTitle());
+    const html = buildWordDocument(markdown, getExportTitle());
     triggerDownload(
       html,
-      `${getExportTitle()}.docx`,
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      `${getExportTitle()}.doc`,
+      'application/msword'
     );
   };
 
-  const handleExportPdf = () => {
+    const handleExportPdf = () => {
     const markdown = saveToMarkdown();
-    const html = buildHtmlDocument(markdown, getExportTitle());
+    const html = buildPrintHtmlDocument(markdown, getExportTitle());
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Impossible d’ouvrir la fenêtre d’impression. Vérifiez votre bloqueur de pop-up.');
+      alert("Impossible d'ouvrir la fenêtre d'impression. Vérifiez votre bloqueur de pop-up.");
       return;
     }
     printWindow.document.open();
@@ -258,7 +258,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     printWindow.focus();
     setTimeout(() => {
       printWindow.print();
-    }, 300);
+    }, 500);
   };
 
   const handleShareLink = async () => {
@@ -427,7 +427,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
                     className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
                   >
                     <FileText size={16} className="text-green-600" />
-                    Export DOCX
+                    Export Word (.doc)
                   </button>
                   <button
                     onClick={() => {

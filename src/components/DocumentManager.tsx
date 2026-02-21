@@ -186,6 +186,10 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
                                   <Clock size={12} />
                                   Modifié {formatDate(doc.updatedAt)}
                                 </span>
+                                <span>Créé {formatDate(doc.createdAt)}</span>
+                                {doc.nodeCount !== undefined && (
+                                  <span>{doc.nodeCount} nœud{doc.nodeCount !== 1 ? 's' : ''}</span>
+                                )}
                                 {doc.id === activeDocId && (
                                   <span className="text-indigo-600 font-medium">• Actif</span>
                                 )}
