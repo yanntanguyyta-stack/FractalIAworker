@@ -106,6 +106,7 @@ export interface AIContextSandwich {
   agentInstructions: string;
   currentNodeContent: string;
   childrenSummary: string;
+  fullDocumentContent: string; // Contenu complet du document (tous nœuds)
   dependencies: NodeData[];
   nodePath: NodeData[];
 }
@@ -155,6 +156,23 @@ function buildChildrenSummary(children: NodeData[], indent: string = ''): string
 }
 
 /**
+ * Construire le contenu complet du document (tous nœuds récursivement)
+ */
+function buildFullDocumentContent(nodes: NodeData[]): string {
+  let content = '';
+  for (const node of nodes) {
+    content += '#'.repeat(node.headingDepth) + ' ' + node.heading + '\n\n';
+    if (node.content.trim()) {
+      content += node.content.trim() + '\n\n';
+    }
+    if (node.children.length > 0) {
+      content += buildFullDocumentContent(node.children);
+    }
+  }
+  return content;
+}
+
+/**
  * Construire le contexte sandwich pour un appel API IA
  */
 export function buildContextSandwich(
@@ -199,6 +217,9 @@ export function buildContextSandwich(
     }
   }
 
+  // Document complet
+  const fullDocumentContent = buildFullDocumentContent(tree);
+
   return {
     globalContext,
     hierarchicalContext,
@@ -206,6 +227,7 @@ export function buildContextSandwich(
     agentInstructions,
     currentNodeContent,
     childrenSummary,
+    fullDocumentContent,
     dependencies,
     nodePath,
   };
@@ -323,6 +345,22 @@ Les sections 📝 CONTENU et 🏗️ SOUS-SECTIONS sont optionnelles selon le co
 
   if (context.globalContext) {
     prompt += `## CONTEXTE GLOBAL DU PROJET\n${context.globalContext}\n\n`;
+  }
+
+  // Document complet en contexte (tronqué si trop volumineux)
+  if (context.fullDocumentContent) {
+    const MAX_DOC_CHARS = 8000; // ~2000 tokens environ
+    const docContent = context.fullDocumentContent.length > MAX_DOC_CHARS
+      ? context.fullDocumentContent.substring(0, MAX_DOC_CHARS) + '\n\n[... document tronqué pour limiter la taille du contexte ...]'
+      : context.fullDocumentContent;
+    prompt += `## DOCUMENT COMPLET (contexte global)
+L'intégralité du document est fournie ci-dessous pour contexte. Tu travailles sur le nœud actif indiqué plus bas, mais tu dois tenir compte de l'ensemble du document pour tes réponses.
+
+\`\`\`markdown
+${docContent}
+\`\`\`
+
+`;
   }
 
   // Nouveau: Contexte hiérarchique (ancêtres)

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, DOCUMENT_ROOT_ID } from '../store';
+import { NodeData } from '../types';
 import mermaid from 'mermaid';
 import {
   Bold,
@@ -62,13 +63,6 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   const editablePreviewRef = useRef<HTMLDivElement>(null);
   const prevNodeIdRef = useRef<string | null>(null);
 
-  // Forcer le mode preview quand H0 est sélectionné
-  useEffect(() => {
-    if (isDocRoot) {
-      setViewMode('preview');
-    }
-  }, [isDocRoot]);
-
   // Animation lors du changement de nœud
   useEffect(() => {
     if (activeNodeId && prevNodeIdRef.current !== activeNodeId) {
@@ -98,10 +92,10 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
     }
   }, [viewMode, activeNodeId, activeNode?.content]);
 
-  // Contenu complet (avec enfants, pour H0)
+  // Contenu complet (avec enfants)
   const fullContent = getNodeFullContent(activeNodeId);
-  // Contenu pour l'aperçu (cohérent avec l'éditeur)
-  const previewContent = isDocRoot ? fullContent : (activeNode?.content || '');
+  // Le contenu prévisualisé est toujours le contenu complet du sous-arbre (nœud + enfants)
+  const previewContent = fullContent;
   
   // Si ni H0 ni nœud actif, afficher un message
   if (!isDocRoot && !activeNode) {
@@ -223,6 +217,32 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Extraire les URLs d'un contenu Markdown pour le tableau de références
+  const extractUrls = (content: string): { text: string; url: string }[] => {
+    const urls: { text: string; url: string }[] = [];
+    const seen = new Set<string>();
+    // Liens markdown: [texte](url) — capturer en premier
+    const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+    let match;
+    while ((match = linkRegex.exec(content)) !== null) {
+      if (!seen.has(match[2])) {
+        urls.push({ text: match[1], url: match[2] });
+        seen.add(match[2]);
+      }
+    }
+    // Supprimer les liens markdown du contenu pour éviter les doublons
+    const contentWithoutLinks = content.replace(/\[[^\]]+\]\(https?:\/\/[^)]+\)/g, '');
+    // URLs brutes restantes
+    const bareUrlRegex = /https?:\/\/[^\s)\]>,"]+/g;
+    while ((match = bareUrlRegex.exec(contentWithoutLinks)) !== null) {
+      if (!seen.has(match[0])) {
+        urls.push({ text: match[0], url: match[0] });
+        seen.add(match[0]);
+      }
+    }
+    return urls;
+  };
+
   // Convertir le Markdown en HTML simple pour la preview
   const renderPreview = (content: string) => {
     // Remplacer les blocs Mermaid par des divs spéciaux avec style amélioré
@@ -301,7 +321,32 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
       .replace(/\n\n/g, '</p><p class="my-2">')
       .replace(/\n/g, '<br />');
 
-    return `<div class="prose max-w-none"><p class="my-2">${html}</p></div>`;
+    let result = `<div class="prose max-w-none"><p class="my-2">${html}</p>`;
+
+    // Tableau de références automatique pour les URLs
+    const urls = extractUrls(content);
+    if (urls.length > 0) {
+      result += `<div class="mt-8 pt-4 border-t-2 border-blue-100">
+        <p class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">🔗 Références</p>
+        <div class="overflow-x-auto"><table class="min-w-full border-collapse border border-gray-200 text-sm rounded-lg overflow-hidden">
+          <thead class="bg-blue-50"><tr>
+            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 border border-gray-200 w-8">#</th>
+            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 border border-gray-200">Texte</th>
+            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 border border-gray-200">URL</th>
+          </tr></thead>
+          <tbody>
+            ${urls.map((u, i) => `<tr class="${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
+              <td class="px-3 py-1.5 border border-gray-200 text-gray-400 text-center">${i + 1}</td>
+              <td class="px-3 py-1.5 border border-gray-200 font-medium text-gray-700">${u.text}</td>
+              <td class="px-3 py-1.5 border border-gray-200 text-blue-600 break-all"><a href="${u.url}" target="_blank" class="hover:underline">${u.url}</a></td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </div>`;
+    }
+
+    result += '</div>';
+    return result;
   };
 
   return (
@@ -472,9 +517,9 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
         </div>
       )}
 
-      {/* Toolbar - désactivé partiellement pour H0 */}
+      {/* Toolbar */}
       <div className="border-b border-gray-200 bg-gray-50 px-2 py-1.5 flex items-center gap-0.5 flex-wrap flex-shrink-0">
-        {!isDocRoot && toolbarButtons.map((btn, idx) =>
+        {activeNode && toolbarButtons.map((btn, idx) =>
           btn.divider ? (
             <div key={idx} className="w-px h-6 bg-gray-300 mx-1.5" />
           ) : (
@@ -483,7 +528,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
               onClick={btn.action}
               className="toolbar-btn tooltip-wrapper"
               data-tooltip={btn.label}
-              disabled={!activeNode}
+              disabled={btn.disabled}
             >
               {btn.icon}
             </button>
@@ -492,7 +537,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
         
         {isDocRoot && (
           <span className="text-xs text-gray-500 italic px-2">
-            Vue document complet - sélectionnez un nœud pour éditer
+            Document complet — sélectionnez un nœud pour éditer son contenu
           </span>
         )}
 
@@ -509,7 +554,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
                 }`}
               >
                 <Edit3 size={14} />
-                Éditer
+                Markdown
               </button>
               <button
                 onClick={() => setViewMode('split')}
@@ -528,7 +573,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
             }`}
           >
             <Eye size={14} />
-            Aperçu
+            Formatté
           </button>
         </div>
       </div>
@@ -554,7 +599,7 @@ Utilisez la barre d'outils pour formater votre texte :
           </div>
         )}
 
-        {/* Split mode: textarea + preview */}
+        {/* Split mode: textarea (nœud actif) + preview (sous-arbre complet) */}
         {!isDocRoot && viewMode === 'split' && activeNode && (
           <>
             <div className="w-1/2 border-r border-gray-200 flex flex-col overflow-hidden">
@@ -578,12 +623,13 @@ Utilisez la barre d'outils pour formater votre texte :
           </>
         )}
 
-        {/* Preview éditable : quand on est en mode preview sur un nœud (pas H0) */}
+        {/* Mode Formatté : nœud actif éditable + enfants en lecture seule */}
         {!isDocRoot && viewMode === 'preview' && activeNode && (
           <div
             ref={editablePreviewRef}
             className="w-full overflow-y-auto p-4 bg-white"
           >
+            {/* Contenu du nœud actif — éditable */}
             <div
               className="prose prose-sm max-w-none focus:outline-none editable-preview"
               contentEditable
@@ -596,13 +642,41 @@ Utilisez la barre d'outils pour formater votre texte :
                   updateNodeContent(activeNode.id, text);
                 }
               }}
+              dangerouslySetInnerHTML={{ __html: renderPreview(activeNode.content) }}
+            />
+            {/* Contenu des nœuds enfants — lecture seule */}
+            {activeNode.children.length > 0 && (
+              <div className="mt-6 pt-4 border-t-2 border-dashed border-indigo-200">
+                <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-3">
+                  ↳ Sections enfants
+                </p>
+                <div
+                  ref={previewRef}
+                  className="prose prose-sm max-w-none text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: renderPreview(
+                    activeNode.children.map((child: NodeData) => getNodeFullContent(child.id)).join('\n\n')
+                  ) }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* H0 ou aucun nœud : vue formatée du document complet (lecture seule) */}
+        {(isDocRoot || (!activeNode && !isDocRoot)) && viewMode === 'preview' && (
+          <div
+            ref={previewRef}
+            className="w-full overflow-y-auto p-4 bg-white"
+          >
+            <div
+              className="prose prose-sm max-w-none"
               dangerouslySetInnerHTML={{ __html: renderPreview(previewContent) }}
             />
           </div>
         )}
 
-        {/* H0 : preview non éditable (document complet en lecture seule) */}
-        {isDocRoot && (
+        {/* H0 en mode edit ou split : afficher le document complet en lecture seule */}
+        {isDocRoot && (viewMode === 'edit' || viewMode === 'split') && (
           <div
             ref={previewRef}
             className="w-full overflow-y-auto p-4 bg-white"
