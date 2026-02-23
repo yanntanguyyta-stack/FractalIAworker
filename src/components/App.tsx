@@ -11,7 +11,7 @@ import OnboardingWizard from './OnboardingWizard';
 import ImportWizard from './ImportWizard';
 import AdminDashboard from './AdminDashboard';
 import DocumentManager from './DocumentManager';
-import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User, FolderOpen } from 'lucide-react';
+import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User, FolderOpen, Menu, X } from 'lucide-react';
 import { buildHtmlDocument, buildPrintHtmlDocument, buildWordDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
 import { buildDocxBlob } from '../utils/docxExport';
 import {
@@ -23,6 +23,7 @@ import {
 } from '../documentStore';
 
 const ONBOARDING_COMPLETED_KEY = 'fractalia_onboarding_completed';
+const MOBILE_BREAKPOINT = '(max-width: 767px)';
 
 interface AppProps {
   className?: string;
@@ -51,6 +52,11 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
   }, []);
   
+  // Détection mobile
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia(MOBILE_BREAKPOINT).matches);
+  const [activeMobilePanel, setActiveMobilePanel] = useState<'sidebar' | 'editor' | 'chat'>('editor');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // État pour les largeurs des panneaux (en pourcentage)
   const [sidebarWidth, setSidebarWidth] = useState(20);
   const [editorWidth, setEditorWidth] = useState(45);
@@ -212,6 +218,13 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     return () => document.removeEventListener('click', closeMenu);
   }, [showExportMenu]);
 
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_BREAKPOINT);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const getExportTitle = () => tree[0]?.heading?.trim() || 'document-node-ia';
 
   const triggerDownload = (content: string, filename: string, type: string) => {
@@ -360,223 +373,352 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Top Bar */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 text-white px-6 py-4 shadow-lg">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">🧠 Node IA Worker</h1>
-            <p className="text-slate-200 text-sm">
-              Local-First Markdown Collaboration avec IA Persona
-            </p>
+      {/* ===== MOBILE TOP BAR ===== */}
+      {isMobile ? (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 text-white flex-shrink-0">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold">🧠 Node IA Worker</h1>
+              <p className="text-slate-200 text-xs">Local-First Markdown IA</p>
+            </div>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors"
+              aria-label="Menu"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => setDocManagerOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
-              title="Gérer mes documents"
-            >
-              <FolderOpen size={18} />
-              Mes documents
-            </button>
-
-            <button
-              onClick={() => setNewDocWizardOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-xl font-medium transition-colors shadow-sm"
-              title="Créer un nouveau document avec l'IA"
-            >
-              <FilePlus size={18} />
-              Nouveau
-            </button>
-
-            <button
-              onClick={() => setImportWizardOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
-              title="Importer un fichier avec analyse de structure"
-            >
-              <Upload size={18} />
-              Importer
-            </button>
-
-            <div className="relative">
+          {mobileMenuOpen && (
+            <div className="px-4 pb-4 flex flex-col gap-2 max-h-[70vh] overflow-y-auto">
               <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setShowExportMenu((current) => !current);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
-                title="Exporter ou partager"
+                onClick={() => { setDocManagerOpen(true); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors text-sm"
               >
-                <Download size={18} />
-                Exporter
-                <ChevronDown size={14} />
+                <FolderOpen size={16} /> Mes documents
               </button>
-              {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-52 bg-white text-slate-900 rounded-lg shadow-xl border border-slate-200 z-20 overflow-hidden">
+              <button
+                onClick={() => { setNewDocWizardOpen(true); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-xl font-medium transition-colors text-sm"
+              >
+                <FilePlus size={16} /> Nouveau
+              </button>
+              <button
+                onClick={() => { setImportWizardOpen(true); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors text-sm"
+                title="Importer un fichier avec analyse de structure"
+              >
+                <Upload size={16} /> Importer
+              </button>
+              <button
+                onClick={() => { handleExportMarkdown(); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
+              >
+                <FileText size={16} className="text-indigo-600" /> Export Markdown
+              </button>
+              <button
+                onClick={() => { handleExportHtml(); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
+              >
+                <FileCode size={16} className="text-blue-600" /> Export HTML
+              </button>
+              <button
+                onClick={() => { handleExportDocxNative(); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
+              >
+                <FileText size={16} className="text-emerald-700" /> Export Word (.docx)
+              </button>
+              <button
+                onClick={() => { handleExportPdf(); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
+              >
+                <Printer size={16} className="text-rose-600" /> Export PDF
+              </button>
+              <button
+                onClick={() => { handleShareLink(); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
+              >
+                <Share2 size={16} className="text-purple-600" /> Partager
+              </button>
+              <button
+                onClick={() => { handleResetToDefault(); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl font-medium transition-colors text-sm"
+                title="Réinitialiser aux données par défaut"
+              >
+                <RefreshCw size={16} /> Réinitialiser
+              </button>
+              <button
+                onClick={() => { setSettingsOpen(true); setMobileMenuOpen(false); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors text-sm ${
+                  aiConfig.apiKey
+                    ? 'bg-green-500 hover:bg-green-600'
+                    : 'bg-orange-500 hover:bg-orange-600 animate-pulse'
+                }`}
+                title="Configuration IA"
+              >
+                <Settings size={16} /> {aiConfig.apiKey ? 'IA Configurée' : 'Configurer IA'}
+              </button>
+              <button
+                onClick={() => { setOnboardingOpen(true); setMobileMenuOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors text-sm"
+              >
+                <HelpCircle size={16} /> Aide
+              </button>
+              {currentUser && (
+                <>
+                  {currentUser.isAdmin && (
+                    <button
+                      onClick={() => { setAdminOpen(true); setMobileMenuOpen(false); }}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded-xl font-medium transition-colors text-sm"
+                    >
+                      <Shield size={16} /> Admin
+                    </button>
+                  )}
+                  <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-xl text-sm">
+                    <User size={14} />
+                    <span className="truncate">{currentUser.name}</span>
+                  </div>
                   <button
-                    onClick={() => {
-                      handleExportMarkdown();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                    onClick={logout}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors text-sm"
                   >
-                    <FileText size={16} className="text-indigo-600" />
-                    Export Markdown
+                    <LogOut size={16} /> Déconnexion
                   </button>
-                  <button
-                    onClick={() => {
-                      handleExportHtml();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                  >
-                    <FileCode size={16} className="text-blue-600" />
-                    Export HTML
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleExportDocx();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                  >
-                    <FileText size={16} className="text-green-600" />
-                    Export Word (.doc)
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleExportDocxNative();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                  >
-                    <FileText size={16} className="text-emerald-700" />
-                    Export Word (.docx)
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleExportPdf();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                  >
-                    <Printer size={16} className="text-rose-600" />
-                    Export PDF
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleShareLink();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 border-t border-slate-200"
-                  >
-                    <Share2 size={16} className="text-purple-600" />
-                    Partager le lien
-                  </button>
-                </div>
+                </>
               )}
             </div>
+          )}
+        </div>
+      ) : (
+        /* ===== DESKTOP TOP BAR ===== */
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 text-white px-6 py-4 shadow-lg">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">🧠 Node IA Worker</h1>
+              <p className="text-slate-200 text-sm">
+                Local-First Markdown Collaboration avec IA Persona
+              </p>
+            </div>
 
-            <button
-              onClick={handleResetToDefault}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl font-medium transition-colors shadow-sm"
-              title="Réinitialiser aux données par défaut"
-            >
-              <RefreshCw size={18} />
-              Réinitialiser
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDocManagerOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
+                title="Gérer mes documents"
+              >
+                <FolderOpen size={18} />
+                Mes documents
+              </button>
 
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors shadow-sm ${
-                aiConfig.apiKey 
-                  ? 'bg-green-500 hover:bg-green-600' 
-                  : 'bg-orange-500 hover:bg-orange-600 animate-pulse'
-              }`}
-              title="Configuration IA"
-            >
-              <Settings size={18} />
-              {aiConfig.apiKey ? 'IA Configurée' : 'Configurer IA'}
-            </button>
+              <button
+                onClick={() => setNewDocWizardOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-xl font-medium transition-colors shadow-sm"
+                title="Créer un nouveau document avec l'IA"
+              >
+                <FilePlus size={18} />
+                Nouveau
+              </button>
 
-            <button
-              onClick={() => setOnboardingOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
-              title="Aide et tutoriel"
-            >
-              <HelpCircle size={18} />
-              Aide
-            </button>
+              <button
+                onClick={() => setImportWizardOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
+                title="Importer un fichier avec analyse de structure"
+              >
+                <Upload size={18} />
+                Importer
+              </button>
 
-            {currentUser && (
-              <>
-                {currentUser.isAdmin && (
-                  <button
-                    onClick={() => setAdminOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded-xl font-medium transition-colors shadow-sm"
-                    title="Tableau de bord admin"
-                  >
-                    <Shield size={18} />
-                    Admin
-                  </button>
-                )}
-                <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl text-sm">
-                  <User size={16} />
-                  <span className="max-w-24 truncate">{currentUser.name}</span>
-                </div>
+              <div className="relative">
                 <button
-                  onClick={logout}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors shadow-sm"
-                  title="Se déconnecter"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setShowExportMenu((current) => !current);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
+                  title="Exporter ou partager"
                 >
-                  <LogOut size={18} />
-                  Déconnexion
+                  <Download size={18} />
+                  Exporter
+                  <ChevronDown size={14} />
                 </button>
-              </>
-            )}
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white text-slate-900 rounded-lg shadow-xl border border-slate-200 z-20 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        handleExportMarkdown();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                    >
+                      <FileText size={16} className="text-indigo-600" />
+                      Export Markdown
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportHtml();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                    >
+                      <FileCode size={16} className="text-blue-600" />
+                      Export HTML
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportDocx();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                    >
+                      <FileText size={16} className="text-green-600" />
+                      Export Word (.doc)
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportDocxNative();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                    >
+                      <FileText size={16} className="text-emerald-700" />
+                      Export Word (.docx)
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleExportPdf();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
+                    >
+                      <Printer size={16} className="text-rose-600" />
+                      Export PDF
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleShareLink();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 border-t border-slate-200"
+                    >
+                      <Share2 size={16} className="text-purple-600" />
+                      Partager le lien
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleResetToDefault}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl font-medium transition-colors shadow-sm"
+                title="Réinitialiser aux données par défaut"
+              >
+                <RefreshCw size={18} />
+                Réinitialiser
+              </button>
+
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors shadow-sm ${
+                  aiConfig.apiKey 
+                    ? 'bg-green-500 hover:bg-green-600' 
+                    : 'bg-orange-500 hover:bg-orange-600 animate-pulse'
+                }`}
+                title="Configuration IA"
+              >
+                <Settings size={18} />
+                {aiConfig.apiKey ? 'IA Configurée' : 'Configurer IA'}
+              </button>
+
+              <button
+                onClick={() => setOnboardingOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
+                title="Aide et tutoriel"
+              >
+                <HelpCircle size={18} />
+                Aide
+              </button>
+
+              {currentUser && (
+                <>
+                  {currentUser.isAdmin && (
+                    <button
+                      onClick={() => setAdminOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded-xl font-medium transition-colors shadow-sm"
+                      title="Tableau de bord admin"
+                    >
+                      <Shield size={18} />
+                      Admin
+                    </button>
+                  )}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl text-sm">
+                    <User size={16} />
+                    <span className="max-w-24 truncate">{currentUser.name}</span>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors shadow-sm"
+                    title="Se déconnecter"
+                  >
+                    <LogOut size={18} />
+                    Déconnexion
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Main Layout - 3 Colonnes Redimensionnables */}
-      <div ref={containerRef} className="flex-1 flex overflow-hidden">
-        {/* Colonne Gauche - Sidebar (Navigation) */}
-        <div 
-          className="h-full bg-white overflow-hidden flex flex-col flex-shrink-0"
-          style={{ width: `${sidebarWidth}%` }}
-        >
-          <Sidebar />
+      {/* ===== MOBILE: panneau unique ===== */}
+      {isMobile ? (
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {activeMobilePanel === 'sidebar' && <Sidebar />}
+          {activeMobilePanel === 'editor' && <EditorPane />}
+          {activeMobilePanel === 'chat' && (
+            <ChatPane onOpenSettings={() => setSettingsOpen(true)} />
+          )}
         </div>
+      ) : (
+        /* ===== DESKTOP: 3 Colonnes Redimensionnables ===== */
+        <div ref={containerRef} className="flex-1 flex overflow-hidden">
+          {/* Colonne Gauche - Sidebar (Navigation) */}
+          <div 
+            className="h-full bg-white overflow-hidden flex flex-col flex-shrink-0"
+            style={{ width: `${sidebarWidth}%` }}
+          >
+            <Sidebar />
+          </div>
 
-        {/* Séparateur 1 - Entre Sidebar et Éditeur */}
-        <div
-          className="w-2 bg-gray-300 hover:bg-blue-500 active:bg-blue-600 cursor-col-resize flex-shrink-0 flex items-center justify-center transition-colors group"
-          onMouseDown={() => handleMouseDown('sidebar')}
-        >
-          <GripVertical size={12} className="text-gray-500 group-hover:text-white" />
-        </div>
+          {/* Séparateur 1 - Entre Sidebar et Éditeur */}
+          <div
+            className="w-2 bg-gray-300 hover:bg-blue-500 active:bg-blue-600 cursor-col-resize flex-shrink-0 flex items-center justify-center transition-colors group"
+            onMouseDown={() => handleMouseDown('sidebar')}
+          >
+            <GripVertical size={12} className="text-gray-500 group-hover:text-white" />
+          </div>
 
-        {/* Colonne Centrale - Éditeur */}
-        <div 
-          className="h-full bg-white overflow-hidden flex flex-col flex-shrink-0"
-          style={{ width: `${editorWidth}%` }}
-        >
-          <EditorPane />
-        </div>
+          {/* Colonne Centrale - Éditeur */}
+          <div 
+            className="h-full bg-white overflow-hidden flex flex-col flex-shrink-0"
+            style={{ width: `${editorWidth}%` }}
+          >
+            <EditorPane />
+          </div>
 
-        {/* Séparateur 2 - Entre Éditeur et Chat */}
-        <div
-          className="w-2 bg-gray-300 hover:bg-blue-500 active:bg-blue-600 cursor-col-resize flex-shrink-0 flex items-center justify-center transition-colors group"
-          onMouseDown={() => handleMouseDown('editor')}
-        >
-          <GripVertical size={12} className="text-gray-500 group-hover:text-white" />
-        </div>
+          {/* Séparateur 2 - Entre Éditeur et Chat */}
+          <div
+            className="w-2 bg-gray-300 hover:bg-blue-500 active:bg-blue-600 cursor-col-resize flex-shrink-0 flex items-center justify-center transition-colors group"
+            onMouseDown={() => handleMouseDown('editor')}
+          >
+            <GripVertical size={12} className="text-gray-500 group-hover:text-white" />
+          </div>
 
-        {/* Colonne Droite - Chat IA (prend le reste) */}
-        <div className="h-full bg-white overflow-hidden flex flex-col flex-1">
-          <ChatPane onOpenSettings={() => setSettingsOpen(true)} />
+          {/* Colonne Droite - Chat IA (prend le reste) */}
+          <div className="h-full bg-white overflow-hidden flex flex-col flex-1">
+            <ChatPane onOpenSettings={() => setSettingsOpen(true)} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Input fichier caché */}
       <input
@@ -598,15 +740,50 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
         </div>
       )}
 
-      {/* Footer - Info */}
-      <div className="bg-gray-100 border-t border-gray-200 px-6 py-3 text-xs text-gray-600 flex items-center justify-between">
-        <span>
-          📁 {tree.length} nœuds racine chargés • Version 2.0 • Local-First Architecture
-        </span>
-        <span>
-          💾 Modification automatique • 🤖 Contexte Sandwich IA • 📝 Métadonnées HTML invisibles
-        </span>
-      </div>
+      {/* ===== MOBILE: barre de navigation basse ===== */}
+      {isMobile && (
+        <div className="flex-shrink-0 border-t border-gray-200 bg-white flex">
+          <button
+            onClick={() => setActiveMobilePanel('sidebar')}
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors ${
+              activeMobilePanel === 'sidebar' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="text-base">📁</span>
+            Structure
+          </button>
+          <button
+            onClick={() => setActiveMobilePanel('editor')}
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors ${
+              activeMobilePanel === 'editor' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="text-base">✏️</span>
+            Éditeur
+          </button>
+          <button
+            onClick={() => setActiveMobilePanel('chat')}
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors ${
+              activeMobilePanel === 'chat' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="text-base">🤖</span>
+            Chat IA
+          </button>
+        </div>
+      )}
+
+      {/* ===== DESKTOP: Footer ===== */}
+      {!isMobile && (
+        <div className="bg-gray-100 border-t border-gray-200 px-6 py-3 text-xs text-gray-600 flex items-center justify-between">
+          <span>
+            📁 {tree.length} nœuds racine chargés • Version 2.0 • Local-First Architecture
+          </span>
+          <span>
+            💾 Modification automatique • 🤖 Contexte Sandwich IA • 📝 Métadonnées HTML invisibles
+          </span>
+        </div>
+      )}
 
       {/* Modal Configuration IA */}
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
