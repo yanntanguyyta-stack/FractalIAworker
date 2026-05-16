@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, DOCUMENT_ROOT_ID } from '../store';
 import { NodeData } from '../types';
-import { renderPreview } from '../utils/markdownPreview';
+import MarkdownPreview from './MarkdownPreview';
 import mermaid from 'mermaid';
 import {
   Bold,
@@ -469,11 +469,11 @@ Utilisez la barre d'outils pour formater votre texte :
                 <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-3">
                   ↳ Sections enfants
                 </p>
-                <div
-                  className="prose prose-sm max-w-none text-gray-700"
-                  dangerouslySetInnerHTML={{ __html: renderPreview(
-                    activeNode.children.map((child: NodeData) => getNodeFullContent(child.id)).join('\n\n')
-                  ) }}
+                <MarkdownPreview
+                  className="prose-sm text-gray-700"
+                  content={activeNode.children
+                    .map((child: NodeData) => getNodeFullContent(child.id))
+                    .join('\n\n')}
                 />
               </div>
             )}
@@ -496,10 +496,7 @@ Utilisez la barre d'outils pour formater votre texte :
               ref={previewRef}
               className="w-1/2 overflow-y-auto p-4 bg-white"
             >
-              <div
-                className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: renderPreview(previewContent) }}
-              />
+              <MarkdownPreview className="prose-sm" content={previewContent} />
             </div>
           </>
         )}
@@ -510,10 +507,7 @@ Utilisez la barre d'outils pour formater votre texte :
             ref={previewRef}
             className="w-full overflow-y-auto p-4 bg-white"
           >
-            <div
-              className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: renderPreview(previewContent) }}
-            />
+            <MarkdownPreview className="prose-sm" content={previewContent} />
           </div>
         )}
 
@@ -523,10 +517,7 @@ Utilisez la barre d'outils pour formater votre texte :
             ref={previewRef}
             className="w-full overflow-y-auto p-4 bg-white"
           >
-            <div
-              className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: renderPreview(previewContent) }}
-            />
+            <MarkdownPreview className="prose-sm" content={previewContent} />
           </div>
         )}
       </div>
