@@ -1,20 +1,31 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste, GripVertical, Search, Undo2, Redo2, FileText, Pencil, ChevronUp as LevelUp, ChevronDown as LevelDown, MoreHorizontal, Sparkles } from 'lucide-react';
+import {
+  ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste,
+  GripVertical, Search, Undo2, Redo2, FileText, Pencil,
+  ChevronUp as LevelUp, ChevronDown as LevelDown, Sparkles,
+} from 'lucide-react';
 import { useStore, DOCUMENT_ROOT_ID } from '../store';
 import { NodeData } from '../types';
+import {
+  countAllNodes,
+  getMaxDepth,
+  isNodeIncomplete,
+  highlightMatch,
+} from '../utils/treeSearch';
+import { useTreeSearch } from '../hooks/useTreeSearch';
+import { useDragDrop } from '../hooks/useDragDrop';
 
 interface SidebarProps {
   className?: string;
 }
 
-// Couleurs par niveau de profondeur
 const depthColors = [
-  'border-blue-500',    // niveau 1
-  'border-indigo-500',  // niveau 2
-  'border-purple-500',  // niveau 3
-  'border-pink-500',    // niveau 4
-  'border-rose-500',    // niveau 5
-  'border-orange-500',  // niveau 6
+  'border-blue-500',
+  'border-indigo-500',
+  'border-purple-500',
+  'border-pink-500',
+  'border-rose-500',
+  'border-orange-500',
 ];
 
 const depthBgColors = [
@@ -26,106 +37,31 @@ const depthBgColors = [
   'bg-orange-50',
 ];
 
-// Compter tous les nœuds récursivement
-function countAllNodes(nodes: NodeData[]): number {
-  let count = 0;
-  for (const node of nodes) {
-    count += 1;
-    if (node.children.length > 0) {
-      count += countAllNodes(node.children);
-    }
-  }
-  return count;
-}
-
-// Trouver la profondeur maximale
-function getMaxDepth(nodes: NodeData[], currentDepth: number = 1): number {
-  let maxDepth = currentDepth;
-  for (const node of nodes) {
-    if (node.children.length > 0) {
-      const childDepth = getMaxDepth(node.children, currentDepth + 1);
-      if (childDepth > maxDepth) maxDepth = childDepth;
-    }
-  }
-  return maxDepth;
-}
-
-function filterTreeForSearch(nodes: NodeData[], term: string) {
-  const expandedIds = new Set<string>();
-  const matchIds = new Set<string>();
-  const lowerTerm = term.toLowerCase();
-
-  function filterNodes(list: NodeData[]): NodeData[] {
-    const result: NodeData[] = [];
-    for (const node of list) {
-      const matchesHeading = node.heading.toLowerCase().includes(lowerTerm);
-      const matchesContent = node.content.toLowerCase().includes(lowerTerm);
-      const filteredChildren = filterNodes(node.children);
-      if (matchesHeading || matchesContent || filteredChildren.length > 0) {
-        if (filteredChildren.length > 0) {
-          expandedIds.add(node.id);
-        }
-        if (matchesHeading || matchesContent) {
-          matchIds.add(node.id);
-        }
-        result.push({ ...node, children: filteredChildren });
-      }
-    }
-    return result;
-  }
-
-  return {
-    nodes: filterNodes(nodes),
-    expandedIds,
-    matchIds,
-  };
-}
-
-function highlightMatch(text: string, term: string) {
-  if (!term) return text;
-  const lowerText = text.toLowerCase();
-  const lowerTerm = term.toLowerCase();
-  const index = lowerText.indexOf(lowerTerm);
-  if (index === -1) return text;
-  const before = text.slice(0, index);
-  const match = text.slice(index, index + term.length);
-  const after = text.slice(index + term.length);
-  return (
-    <>
-      {before}
-      <mark className="bg-yellow-200 text-yellow-900 rounded px-0.5">{match}</mark>
-      {after}
-    </>
-  );
-}
-
-// Règles de détection d'incomplétude
-const PLACEHOLDER_PATTERNS = [
-  /\btodo\b/i,
-  /\bà compléter\b/i,
-  /\btbd\b/i,
-  /\bwip\b/i,
-  /\ben cours\b/i,
-  /\bà rédiger\b/i,
-  /\bà définir\b/i,
-];
-const MIN_CONTENT_LENGTH = 50;
-
-function isNodeIncomplete(node: NodeData): boolean {
-  const content = node.content.trim();
-  if (content === '') return true;
-  if (content.length < MIN_CONTENT_LENGTH) return true;
-  if (PLACEHOLDER_PATTERNS.some(re => re.test(content))) return true;
-  return false;
-}
-
 const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
-  const { tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode, moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode, demoteNode, selectDocumentRoot, updateNodeHeading, setPendingAIPrompt } = useStore();
+  const {
+    tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode,
+    moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode,
+    demoteNode, selectDocumentRoot, updateNodeHeading, setPendingAIPrompt,
+  } = useStore();
   const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [draggedNodeId, setDraggedNodeId] = React.useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = React.useState<string | null>(null);
+
+  const {
+    searchTerm, setSearchTerm, trimmedSearch, searchResults,
+    visibleTree, matchIds,
+  } = useTreeSearch(tree);
+
+  const handleMoveNode = React.useCallback((sourceId: string, targetId: string | null) => {
+    const success = moveNode(sourceId, targetId);
+    if (!success) {
+      alert('Impossible de déplacer ce nœud (profondeur maximale atteinte ou cible invalide).');
+    }
+  }, [moveNode]);
+
+  const { getNodeHandlers, getRootHandlers } = useDragDrop(handleMoveNode);
+  const rootHandlers = getRootHandlers();
+
+  const effectiveExpanded = searchResults ? searchResults.expandedIds : expanded;
 
   // Expand all by default on first load, and re-expand new nodes on tree change
   const prevTreeRef = React.useRef<string>('');
@@ -134,15 +70,12 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     function collectIds(nodes: NodeData[]) {
       for (const node of nodes) {
         allIds.add(node.id);
-        if (node.children.length > 0) {
-          collectIds(node.children);
-        }
+        if (node.children.length > 0) collectIds(node.children);
       }
     }
     collectIds(tree);
     const treeSignature = Array.from(allIds).sort().join(',');
     if (treeSignature !== prevTreeRef.current) {
-      // Ajouter les nouveaux IDs sans supprimer les anciens
       setExpanded(prev => {
         const merged = new Set(prev);
         allIds.forEach(id => merged.add(id));
@@ -154,11 +87,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
   const toggleExpanded = (nodeId: string) => {
     const newExpanded = new Set(expanded);
-    if (newExpanded.has(nodeId)) {
-      newExpanded.delete(nodeId);
-    } else {
-      newExpanded.add(nodeId);
-    }
+    if (newExpanded.has(nodeId)) newExpanded.delete(nodeId);
+    else newExpanded.add(nodeId);
     setExpanded(newExpanded);
   };
 
@@ -167,31 +97,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     function collectIds(nodes: NodeData[]) {
       for (const node of nodes) {
         allIds.add(node.id);
-        if (node.children.length > 0) {
-          collectIds(node.children);
-        }
+        if (node.children.length > 0) collectIds(node.children);
       }
     }
     collectIds(tree);
     setExpanded(allIds);
   };
 
-  const collapseAll = () => {
-    setExpanded(new Set());
-  };
-
-  const trimmedSearch = searchTerm.trim();
-  const searchResults = trimmedSearch ? filterTreeForSearch(tree, trimmedSearch) : null;
-  const visibleTree = searchResults ? searchResults.nodes : tree;
-  const effectiveExpanded = searchResults ? searchResults.expandedIds : expanded;
-  const matchIds = searchResults ? searchResults.matchIds : new Set<string>();
-
-  const handleMoveNode = (sourceId: string, targetId: string | null) => {
-    const success = moveNode(sourceId, targetId);
-    if (!success) {
-      alert('Impossible de déplacer ce nœud (profondeur maximale atteinte ou cible invalide).');
-    }
-  };
+  const collapseAll = () => setExpanded(new Set());
 
   const handlePasteNode = (targetId: string | null) => {
     const success = pasteNode(targetId);
@@ -205,15 +118,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     const hasChildren = node.children.length > 0;
     const isActive = activeNodeId === node.id;
     const colorIndex = Math.min(depth, depthColors.length - 1);
-    const isDropTarget = dropTargetId === node.id;
+    const dragHandlers = getNodeHandlers(node.id);
     const incomplete = isNodeIncomplete(node);
 
     return (
       <div key={node.id} className="select-none sidebar-node-item">
-        {/* Ligne de connexion verticale */}
         <div className="relative">
           {depth > 0 && (
-            <div 
+            <div
               className="absolute left-0 top-0 bottom-0 w-px bg-gray-200"
               style={{ left: `${(depth - 1) * 16 + 10}px` }}
             />
@@ -223,48 +135,20 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               isActive
                 ? `${depthBgColors[colorIndex]} border-l-4 ${depthColors[colorIndex]} shadow-sm`
                 : 'hover:bg-gray-100 border-l-4 border-transparent'
-            } ${isDropTarget ? 'ring-2 ring-blue-400' : ''}`}
+            } ${dragHandlers.isDropTarget ? 'ring-2 ring-blue-400' : ''}`}
             style={{ marginLeft: `${depth * 16}px` }}
             onClick={() => selectNode(node.id)}
-            draggable
-            onDragStart={(event) => {
-              event.stopPropagation();
-              setDraggedNodeId(node.id);
-              event.dataTransfer.setData('text/plain', node.id);
-              event.dataTransfer.effectAllowed = 'move';
-            }}
-            onDragEnd={() => {
-              setDraggedNodeId(null);
-              setDropTargetId(null);
-            }}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              setDropTargetId(node.id);
-              event.dataTransfer.dropEffect = 'move';
-            }}
-            onDragLeave={(event) => {
-              event.stopPropagation();
-              setDropTargetId((current) => (current === node.id ? null : current));
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              const sourceId = draggedNodeId || event.dataTransfer.getData('text/plain');
-              setDraggedNodeId(null);
-              setDropTargetId(null);
-              if (sourceId) {
-                handleMoveNode(sourceId, node.id);
-              }
-            }}
+            draggable={dragHandlers.draggable}
+            onDragStart={dragHandlers.onDragStart}
+            onDragEnd={dragHandlers.onDragEnd}
+            onDragOver={dragHandlers.onDragOver}
+            onDragLeave={dragHandlers.onDragLeave}
+            onDrop={dragHandlers.onDrop}
           >
             <GripVertical size={12} className="text-gray-400 flex-shrink-0" />
             {hasChildren ? (
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleExpanded(node.id);
-                }}
+                onClick={(e) => { e.stopPropagation(); toggleExpanded(node.id); }}
                 className="p-0.5 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
                 aria-label={isExpanded ? 'Replier' : 'Déplier'}
               >
@@ -278,7 +162,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               <div className="w-4 flex-shrink-0" />
             )}
 
-            {/* Indicateur de niveau */}
             <span className={`text-[10px] font-bold px-1 rounded ${depthBgColors[colorIndex]} ${depthColors[colorIndex].replace('border-', 'text-')}`}>
               H{node.headingDepth}
             </span>
@@ -287,7 +170,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               {matchIds.has(node.id) ? highlightMatch(node.heading || '(Sans titre)', trimmedSearch) : node.heading || '(Sans titre)'}
             </span>
 
-            {/* Badge "À compléter" */}
             {incomplete && (
               <span
                 className="text-[9px] font-bold px-1 py-0.5 bg-amber-100 text-amber-700 rounded flex-shrink-0"
@@ -297,7 +179,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               </span>
             )}
 
-            {/* Indicateurs de type */}
             {node.meta.contextConfig?.isGlobal && (
               <span className="text-green-500 text-[10px] flex-shrink-0" title="Contexte global">🌐</span>
             )}
@@ -312,22 +193,18 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
           </div>
         </div>
 
-        {/* Barre d'outils contextuelle - apparaît sous le nœud actif */}
         {isActive && (
-          <div 
+          <div
             className="flex items-center gap-1 px-2 py-1 mx-1 mb-1 bg-slate-100 rounded-md border border-slate-200 flex-wrap"
             style={{ marginLeft: `${depth * 16 + 8}px` }}
           >
-            {/* Ajouter enfant */}
             {node.headingDepth < 6 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   const childLevel = node.headingDepth + 1;
                   const title = prompt(`Créer un sous-nœud (H${childLevel}) sous "${node.heading}":\n\nTitre du nouveau nœud :`);
-                  if (title && title.trim()) {
-                    addChild(node.id, title.trim());
-                  }
+                  if (title && title.trim()) addChild(node.id, title.trim());
                 }}
                 className="p-1.5 hover:bg-green-200 rounded text-green-700 tooltip-wrapper"
                 data-tooltip={`Ajouter H${node.headingDepth + 1}`}
@@ -336,7 +213,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               </button>
             )}
 
-            {/* Renommer */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -351,25 +227,17 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               <Pencil size={14} />
             </button>
 
-            {/* Copier */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                copyNode(node.id);
-              }}
+              onClick={(e) => { e.stopPropagation(); copyNode(node.id); }}
               className="p-1.5 hover:bg-blue-200 rounded text-blue-700 tooltip-wrapper"
               data-tooltip="Copier"
             >
               <Copy size={14} />
             </button>
 
-            {/* Coller */}
             {clipboardNode && (
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePasteNode(node.id);
-                }}
+                onClick={(e) => { e.stopPropagation(); handlePasteNode(node.id); }}
                 className="p-1.5 hover:bg-indigo-200 rounded text-indigo-700 tooltip-wrapper"
                 data-tooltip="Coller comme enfant"
               >
@@ -379,13 +247,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
             <span className="w-px h-5 bg-slate-300 mx-0.5" />
 
-            {/* Promouvoir */}
             {node.headingDepth > 1 && (
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  promoteNode(node.id, true);
-                }}
+                onClick={(e) => { e.stopPropagation(); promoteNode(node.id, true); }}
                 className="p-1.5 hover:bg-amber-200 rounded tooltip-wrapper flex items-center gap-0.5"
                 data-tooltip={`Promouvoir en H${node.headingDepth - 1}`}
               >
@@ -394,7 +258,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               </button>
             )}
 
-            {/* Rétrograder */}
             {node.headingDepth < 6 && (
               <button
                 onClick={(e) => {
@@ -414,7 +277,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
             <span className="w-px h-5 bg-slate-300 mx-0.5" />
 
-            {/* Supprimer */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -428,7 +290,6 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               <Trash2 size={14} />
             </button>
 
-            {/* Proposer un enrichissement IA (visible si nœud incomplet) */}
             {incomplete && (
               <>
                 <span className="w-px h-5 bg-slate-300 mx-0.5" />
@@ -461,14 +322,12 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const totalNodes = countAllNodes(tree);
   const maxDepth = getMaxDepth(tree);
 
-  // Fonction pour ajouter un nœud racine (H1)
   const handleAddRootNode = () => {
     const title = prompt('Créer un nouveau nœud racine (H1) :\n\nTitre du nœud :');
     if (title && title.trim()) {
-      // Sauvegarder l'état avant modification (via _pushHistory interne)
       const state = useStore.getState() as any;
       if (state._pushHistory) state._pushHistory();
-      
+
       const { tree } = useStore.getState();
       const newNode = {
         id: Date.now().toString(36) + Math.random().toString(36).substr(2),
@@ -489,9 +348,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const historyCanRedo = canRedo();
 
   return (
-    <div
-      className={`bg-white flex flex-col h-full ${className}`}
-    >
+    <div className={`bg-white flex flex-col h-full ${className}`}>
       <div className="p-3 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -499,8 +356,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             Structure
           </h2>
           <div className="flex gap-1">
-            {/* Boutons Undo/Redo */}
-            <button 
+            <button
               onClick={undo}
               disabled={!historyCanUndo}
               className={`text-xs px-2 py-1 rounded transition-colors ${historyCanUndo ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
@@ -508,7 +364,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             >
               <Undo2 size={14} />
             </button>
-            <button 
+            <button
               onClick={redo}
               disabled={!historyCanRedo}
               className={`text-xs px-2 py-1 rounded transition-colors ${historyCanRedo ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
@@ -517,21 +373,21 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               <Redo2 size={14} />
             </button>
             <span className="w-px bg-gray-300 mx-1"></span>
-            <button 
+            <button
               onClick={handleAddRootNode}
               className="text-xs px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors font-medium"
               title="Ajouter un nœud racine (H1)"
             >
               + H1
             </button>
-            <button 
+            <button
               onClick={expandAll}
               className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
               title="Tout déplier"
             >
               ⊞
             </button>
-            <button 
+            <button
               onClick={collapseAll}
               className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
               title="Tout replier"
@@ -582,21 +438,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
       <div
         className="flex-1 overflow-y-auto min-h-0"
-        onDragOver={(event) => {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = 'move';
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          const sourceId = draggedNodeId || event.dataTransfer.getData('text/plain');
-          setDraggedNodeId(null);
-          setDropTargetId(null);
-          if (sourceId) {
-            handleMoveNode(sourceId, null);
-          }
-        }}
+        onDragOver={rootHandlers.onDragOver}
+        onDrop={rootHandlers.onDrop}
       >
-        {/* Nœud H0 - Document complet */}
         <div className="p-2 border-b border-gray-200">
           <div
             className={`flex items-center gap-2 px-3 py-2 cursor-pointer rounded-lg transition-all duration-150 ${
