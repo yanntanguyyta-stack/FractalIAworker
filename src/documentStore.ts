@@ -1,11 +1,17 @@
 /**
  * Document Management Store
- * 
- * Gère la liste des documents de l'utilisateur via localStorage.
- * Chaque document est identifié par un ID unique et contient un arbre NodeData[].
+ *
+ * Primary storage: IndexedDB (via idb wrapper).
+ * Reads served synchronously from an in-memory cache populated by initUserStore.
+ * Writes update the cache synchronously and persist to IndexedDB asynchronously
+ * (with localStorage fallback on IDB error).
+ *
+ * Migration: on first init for a user, legacy localStorage data is moved to
+ * IndexedDB and the legacy keys cleared.
  */
 
 import { NodeData } from './types';
+import { getDB, isIndexedDBAvailable, docKey } from './db';
 
 export interface DocumentMeta {
   id: string;
@@ -21,11 +27,15 @@ export interface DocumentIndex {
   documents: DocumentMeta[];
 }
 
+const indexCache = new Map<string, DocumentIndex>();
+const treeCache = new Map<string, NodeData[]>();
+const initializedUsers = new Set<string>();
+
 function getIndexKey(userId: string): string {
   return `fractalia-docindex-${userId}`;
 }
 
-function getDocKey(userId: string, docId: string): string {
+function getDocKeyLS(userId: string, docId: string): string {
   return `fractalia-doc-${userId}-${docId}`;
 }
 
@@ -33,71 +43,6 @@ function generateDocId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 }
 
-/**
- * Charge l'index des documents d'un utilisateur
- */
-export function loadDocumentIndex(userId: string): DocumentIndex {
-  try {
-    const raw = localStorage.getItem(getIndexKey(userId));
-    if (raw) {
-      return JSON.parse(raw) as DocumentIndex;
-    }
-  } catch {
-    // ignore
-  }
-
-  // Migration: si l'utilisateur a l'ancien format fractalia-docs-{userId}
-  const legacyKey = `fractalia-docs-${userId}`;
-  const legacyData = localStorage.getItem(legacyKey);
-  if (legacyData) {
-    try {
-      const tree = JSON.parse(legacyData) as NodeData[];
-      const docId = generateDocId();
-      const now = Date.now();
-      const docName = extractDocumentName(tree) || 'Mon document';
-      const index: DocumentIndex = {
-        activeDocId: docId,
-        documents: [{ id: docId, name: docName, createdAt: now, updatedAt: now }],
-      };
-      // Sauvegarder dans le nouveau format
-      localStorage.setItem(getDocKey(userId, docId), JSON.stringify(tree));
-      localStorage.setItem(getIndexKey(userId), JSON.stringify(index));
-      // Supprimer l'ancien format
-      localStorage.removeItem(legacyKey);
-      return index;
-    } catch {
-      // ignore
-    }
-  }
-
-  return { activeDocId: null, documents: [] };
-}
-
-/**
- * Sauvegarde l'index des documents
- */
-export function saveDocumentIndex(userId: string, index: DocumentIndex): void {
-  localStorage.setItem(getIndexKey(userId), JSON.stringify(index));
-}
-
-/**
- * Charge l'arbre d'un document
- */
-export function loadDocumentTree(userId: string, docId: string): NodeData[] | null {
-  try {
-    const raw = localStorage.getItem(getDocKey(userId, docId));
-    if (raw) {
-      return JSON.parse(raw) as NodeData[];
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-/**
- * Counts the total number of nodes in a tree recursively
- */
 function countNodes(tree: NodeData[]): number {
   let count = tree.length;
   for (const node of tree) {
@@ -106,12 +51,213 @@ function countNodes(tree: NodeData[]): number {
   return count;
 }
 
+function extractDocumentName(tree: NodeData[]): string | null {
+  if (tree.length > 0 && tree[0].heading) return tree[0].heading;
+  return null;
+}
+
+function readIndexFromLocalStorage(userId: string): DocumentIndex | null {
+  try {
+    const raw = localStorage.getItem(getIndexKey(userId));
+    if (raw) return JSON.parse(raw) as DocumentIndex;
+  } catch {
+    // ignore
+  }
+
+  // Legacy v1 format: fractalia-docs-{userId}
+  const legacyKey = `fractalia-docs-${userId}`;
+  try {
+    const legacyData = localStorage.getItem(legacyKey);
+    if (legacyData) {
+      const tree = JSON.parse(legacyData) as NodeData[];
+      const docId = generateDocId();
+      const now = Date.now();
+      const docName = extractDocumentName(tree) || 'Mon document';
+      const index: DocumentIndex = {
+        activeDocId: docId,
+        documents: [{ id: docId, name: docName, createdAt: now, updatedAt: now }],
+      };
+      localStorage.setItem(getDocKeyLS(userId, docId), JSON.stringify(tree));
+      localStorage.setItem(getIndexKey(userId), JSON.stringify(index));
+      localStorage.removeItem(legacyKey);
+      return index;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function readTreeFromLocalStorage(userId: string, docId: string): NodeData[] | null {
+  try {
+    const raw = localStorage.getItem(getDocKeyLS(userId, docId));
+    if (raw) return JSON.parse(raw) as NodeData[];
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function persistIndexToLocalStorage(userId: string, index: DocumentIndex): void {
+  try {
+    localStorage.setItem(getIndexKey(userId), JSON.stringify(index));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+function persistTreeToLocalStorage(userId: string, docId: string, tree: NodeData[]): void {
+  try {
+    localStorage.setItem(getDocKeyLS(userId, docId), JSON.stringify(tree));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+async function migrateFromLocalStorage(userId: string): Promise<void> {
+  const index = readIndexFromLocalStorage(userId);
+  if (!index) return;
+
+  const db = await getDB();
+  await db.put('indexes', index, userId);
+
+  for (const doc of index.documents) {
+    const tree = readTreeFromLocalStorage(userId, doc.id);
+    if (tree) {
+      await db.put('documents', tree, docKey(userId, doc.id));
+    }
+  }
+
+  // Clear legacy localStorage entries after successful migration
+  try {
+    localStorage.removeItem(getIndexKey(userId));
+    for (const doc of index.documents) {
+      localStorage.removeItem(getDocKeyLS(userId, doc.id));
+    }
+  } catch {
+    // ignore
+  }
+}
+
 /**
- * Sauvegarde l'arbre d'un document
+ * Hydrates the in-memory cache for the given user from IndexedDB, performing
+ * a one-time migration from localStorage if needed. Must be awaited before
+ * any synchronous read for this user.
  */
+export async function initUserStore(userId: string): Promise<void> {
+  if (initializedUsers.has(userId)) return;
+
+  if (!isIndexedDBAvailable()) {
+    // Fallback: load from localStorage into the cache
+    const index = readIndexFromLocalStorage(userId);
+    if (index) {
+      indexCache.set(userId, index);
+      for (const doc of index.documents) {
+        const tree = readTreeFromLocalStorage(userId, doc.id);
+        if (tree) treeCache.set(docKey(userId, doc.id), tree);
+      }
+    }
+    initializedUsers.add(userId);
+    return;
+  }
+
+  try {
+    const db = await getDB();
+    let index = await db.get('indexes', userId);
+
+    if (!index) {
+      // Try migration from localStorage
+      await migrateFromLocalStorage(userId);
+      index = await db.get('indexes', userId);
+    }
+
+    if (index) {
+      indexCache.set(userId, index);
+      for (const doc of index.documents) {
+        const tree = await db.get('documents', docKey(userId, doc.id));
+        if (tree) treeCache.set(docKey(userId, doc.id), tree);
+      }
+    }
+  } catch (e) {
+    console.warn('IndexedDB init failed, falling back to localStorage:', e);
+    const index = readIndexFromLocalStorage(userId);
+    if (index) {
+      indexCache.set(userId, index);
+      for (const doc of index.documents) {
+        const tree = readTreeFromLocalStorage(userId, doc.id);
+        if (tree) treeCache.set(docKey(userId, doc.id), tree);
+      }
+    }
+  } finally {
+    initializedUsers.add(userId);
+  }
+}
+
+function schedulePersistIndex(userId: string, index: DocumentIndex): void {
+  if (!isIndexedDBAvailable()) {
+    persistIndexToLocalStorage(userId, index);
+    return;
+  }
+  getDB()
+    .then(db => db.put('indexes', index, userId))
+    .catch(() => persistIndexToLocalStorage(userId, index));
+}
+
+function schedulePersistTree(userId: string, docId: string, tree: NodeData[]): void {
+  if (!isIndexedDBAvailable()) {
+    persistTreeToLocalStorage(userId, docId, tree);
+    return;
+  }
+  getDB()
+    .then(db => db.put('documents', tree, docKey(userId, docId)))
+    .catch(() => persistTreeToLocalStorage(userId, docId, tree));
+}
+
+function scheduleDeleteTree(userId: string, docId: string): void {
+  if (!isIndexedDBAvailable()) {
+    try { localStorage.removeItem(getDocKeyLS(userId, docId)); } catch { /* ignore */ }
+    return;
+  }
+  getDB()
+    .then(db => db.delete('documents', docKey(userId, docId)))
+    .catch(() => {
+      try { localStorage.removeItem(getDocKeyLS(userId, docId)); } catch { /* ignore */ }
+    });
+}
+
+export function loadDocumentIndex(userId: string): DocumentIndex {
+  const cached = indexCache.get(userId);
+  if (cached) return cached;
+  // Fallback for callers that did not init (e.g., legacy code paths)
+  const fromLS = readIndexFromLocalStorage(userId);
+  if (fromLS) {
+    indexCache.set(userId, fromLS);
+    return fromLS;
+  }
+  return { activeDocId: null, documents: [] };
+}
+
+export function saveDocumentIndex(userId: string, index: DocumentIndex): void {
+  indexCache.set(userId, index);
+  schedulePersistIndex(userId, index);
+}
+
+export function loadDocumentTree(userId: string, docId: string): NodeData[] | null {
+  const cached = treeCache.get(docKey(userId, docId));
+  if (cached) return cached;
+  // Fallback if not preloaded
+  const fromLS = readTreeFromLocalStorage(userId, docId);
+  if (fromLS) {
+    treeCache.set(docKey(userId, docId), fromLS);
+    return fromLS;
+  }
+  return null;
+}
+
 export function saveDocumentTree(userId: string, docId: string, tree: NodeData[]): void {
-  localStorage.setItem(getDocKey(userId, docId), JSON.stringify(tree));
-  // Mettre à jour updatedAt et nodeCount dans l'index
+  treeCache.set(docKey(userId, docId), tree);
+  schedulePersistTree(userId, docId, tree);
+
   const index = loadDocumentIndex(userId);
   const doc = index.documents.find(d => d.id === docId);
   if (doc) {
@@ -121,9 +267,6 @@ export function saveDocumentTree(userId: string, docId: string, tree: NodeData[]
   }
 }
 
-/**
- * Crée un nouveau document et retourne son ID
- */
 export function createDocument(userId: string, name: string, tree: NodeData[]): string {
   const docId = generateDocId();
   const now = Date.now();
@@ -131,13 +274,11 @@ export function createDocument(userId: string, name: string, tree: NodeData[]): 
   index.documents.push({ id: docId, name, createdAt: now, updatedAt: now, nodeCount: countNodes(tree) });
   index.activeDocId = docId;
   saveDocumentIndex(userId, index);
-  localStorage.setItem(getDocKey(userId, docId), JSON.stringify(tree));
+  treeCache.set(docKey(userId, docId), tree);
+  schedulePersistTree(userId, docId, tree);
   return docId;
 }
 
-/**
- * Supprime un document
- */
 export function deleteDocument(userId: string, docId: string): void {
   const index = loadDocumentIndex(userId);
   index.documents = index.documents.filter(d => d.id !== docId);
@@ -145,12 +286,10 @@ export function deleteDocument(userId: string, docId: string): void {
     index.activeDocId = index.documents.length > 0 ? index.documents[0].id : null;
   }
   saveDocumentIndex(userId, index);
-  localStorage.removeItem(getDocKey(userId, docId));
+  treeCache.delete(docKey(userId, docId));
+  scheduleDeleteTree(userId, docId);
 }
 
-/**
- * Renomme un document
- */
 export function renameDocument(userId: string, docId: string, newName: string): void {
   const index = loadDocumentIndex(userId);
   const doc = index.documents.find(d => d.id === docId);
@@ -160,9 +299,6 @@ export function renameDocument(userId: string, docId: string, newName: string): 
   }
 }
 
-/**
- * Définit le document actif
- */
 export function setActiveDocument(userId: string, docId: string): void {
   const index = loadDocumentIndex(userId);
   if (index.documents.some(d => d.id === docId)) {
@@ -171,19 +307,6 @@ export function setActiveDocument(userId: string, docId: string): void {
   }
 }
 
-/**
- * Extrait le nom du document depuis l'arbre (premier heading H1)
- */
-function extractDocumentName(tree: NodeData[]): string | null {
-  if (tree.length > 0 && tree[0].heading) {
-    return tree[0].heading;
-  }
-  return null;
-}
-
-/**
- * Duplique un document
- */
 export function duplicateDocument(userId: string, docId: string): string | null {
   const tree = loadDocumentTree(userId, docId);
   const index = loadDocumentIndex(userId);
@@ -192,9 +315,6 @@ export function duplicateDocument(userId: string, docId: string): string | null 
   return createDocument(userId, `${original.name} (copie)`, tree);
 }
 
-/**
- * Met à jour les tags d'un document
- */
 export function updateDocumentTags(userId: string, docId: string, tags: string[]): void {
   const index = loadDocumentIndex(userId);
   const doc = index.documents.find(d => d.id === docId);
@@ -202,4 +322,11 @@ export function updateDocumentTags(userId: string, docId: string, tags: string[]
     doc.tags = tags.map(t => t.trim()).filter(t => t.length > 0);
     saveDocumentIndex(userId, index);
   }
+}
+
+// Test helpers
+export function _resetCachesForTests(): void {
+  indexCache.clear();
+  treeCache.clear();
+  initializedUsers.clear();
 }

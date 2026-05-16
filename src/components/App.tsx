@@ -20,6 +20,7 @@ import {
   saveDocumentTree,
   createDocument as createDocEntry,
   setActiveDocument,
+  initUserStore,
 } from '../documentStore';
 
 const ONBOARDING_COMPLETED_KEY = 'fractalia_onboarding_completed';
@@ -65,6 +66,8 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
   // Charger les données au montage (partagées, utilisateur ou mock)
   useEffect(() => {
+    let cancelled = false;
+
     const hash = window.location.hash;
     if (hash.startsWith('#share=')) {
       try {
@@ -77,33 +80,40 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       }
     }
 
-    if (currentUser) {
-      // Charger la configuration IA sauvegardée de l'utilisateur
-      if (currentUser.savedApiConfig) {
-        setAIConfig({ ...aiConfig, ...currentUser.savedApiConfig });
-      }
+    async function loadUserDocuments() {
+      if (currentUser) {
+        if (currentUser.savedApiConfig) {
+          setAIConfig({ ...aiConfig, ...currentUser.savedApiConfig });
+        }
 
-      // Charger les documents via le nouveau document store
-      const index = loadDocumentIndex(currentUser.id);
-      if (index.activeDocId && index.documents.length > 0) {
-        const docTree = loadDocumentTree(currentUser.id, index.activeDocId);
-        if (docTree) {
-          setActiveDocId(index.activeDocId);
-          loadTree(docTree);
-          return;
+        await initUserStore(currentUser.id);
+        if (cancelled) return;
+
+        const index = loadDocumentIndex(currentUser.id);
+        if (index.activeDocId && index.documents.length > 0) {
+          const docTree = loadDocumentTree(currentUser.id, index.activeDocId);
+          if (docTree) {
+            setActiveDocId(index.activeDocId);
+            loadTree(docTree);
+            return;
+          }
         }
       }
+
+      if (cancelled) return;
+      loadMarkdown(INITIAL_MARKDOWN);
+      if (currentUser) {
+        setTimeout(() => {
+          if (cancelled) return;
+          const currentTree = useStore.getState().tree;
+          const docId = createDocEntry(currentUser.id, 'Bienvenue - Démo', currentTree);
+          setActiveDocId(docId);
+        }, 100);
+      }
     }
 
-    loadMarkdown(INITIAL_MARKDOWN);
-    // Créer un premier document pour les nouveaux utilisateurs
-    if (currentUser) {
-      setTimeout(() => {
-        const currentTree = useStore.getState().tree;
-        const docId = createDocEntry(currentUser.id, 'Bienvenue - Démo', currentTree);
-        setActiveDocId(docId);
-      }, 100);
-    }
+    loadUserDocuments();
+    return () => { cancelled = true; };
   }, [currentUser?.id]);
 
   // Sauvegarde automatique des documents par utilisateur

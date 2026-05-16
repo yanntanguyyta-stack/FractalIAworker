@@ -14,8 +14,10 @@ import {
 
 type DocxChild = Paragraph | Table;
 
+type HeadingLevelValue = (typeof HeadingLevel)[keyof typeof HeadingLevel];
+
 // Mapping markdown heading depth (1-6) to DOCX HeadingLevel
-const HEADING_LEVEL_MAP: Record<number, HeadingLevel> = {
+const HEADING_LEVEL_MAP: Record<number, HeadingLevelValue> = {
   1: HeadingLevel.HEADING_1,
   2: HeadingLevel.HEADING_2,
   3: HeadingLevel.HEADING_3,

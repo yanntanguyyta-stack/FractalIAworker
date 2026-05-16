@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { vi, beforeEach } from 'vitest';
+import 'fake-indexeddb/auto';
+import { _resetCachesForTests } from '../documentStore';
+import { _resetDBForTests } from '../db';
 
 // ─── Mock @clerk/clerk-react pour les tests ───────────────────────────────────
 vi.mock('@clerk/clerk-react', () => ({
@@ -56,8 +59,19 @@ const localStorageMock = {
 global.localStorage = localStorageMock as any;
 
 // Reset mocks entre les tests
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   localStorageMock.getItem.mockReset();
   localStorageMock.setItem.mockReset();
+  _resetCachesForTests();
+  // Close any open DB connection so deleteDatabase doesn't block
+  await _resetDBForTests();
+  if (typeof indexedDB !== 'undefined') {
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase('fractalia');
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    });
+  }
 });

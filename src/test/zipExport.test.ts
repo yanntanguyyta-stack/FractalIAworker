@@ -68,7 +68,7 @@ describe('zipExport', () => {
       docsFolder?.file('doc1.json', JSON.stringify(sampleTree));
       docsFolder?.file('doc2.json', JSON.stringify(sampleTree));
       const uint8 = await zip.generateAsync({ type: 'uint8array' });
-      const file = new File([uint8], 'docs.zip', { type: 'application/zip' });
+      const file = new File([uint8 as BlobPart], 'docs.zip', { type: 'application/zip' });
       const bundle = await importDocumentsFromZip(file);
       expect(bundle.index.documents.length).toBe(2);
       expect(bundle.documents['doc1']).toBeDefined();
