@@ -103,7 +103,10 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   // in renderNode.
   React.useEffect(() => {
     if (!recentlyMovedNodeId) return;
-    const el = document.querySelector(`[data-node-id="${recentlyMovedNodeId}"]`);
+    // IDs can come from imported Markdown — avoid building a raw CSS selector.
+    const el = Array.from(document.querySelectorAll('[data-node-id]')).find(
+      n => n.getAttribute('data-node-id') === recentlyMovedNodeId
+    );
     if (el) {
       el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }

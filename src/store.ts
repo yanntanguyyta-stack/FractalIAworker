@@ -283,24 +283,11 @@ function applyDepthDelta(
   const state = get();
   const flat = flattenTreeForRebuild(state.tree);
 
-  // Build, for each target node, the set of ids whose depth must shift
-  // (target + descendants if withChildren). We walk the doc-ordered flat
-  // list: a node's descendants are the consecutive entries whose
-  // headingDepth is strictly greater than the target's, until we hit a
-  // sibling or shallower entry.
+  // For each target: descendants are consecutive doc-ordered entries with
+  // strictly greater headingDepth, until we hit a sibling or shallower entry.
+  // We compute the final shift set after validation (below) — no need for a
+  // pre-pass.
   const idSet = new Set(nodeIds);
-  const shiftIds = new Set<string>();
-
-  for (let i = 0; i < flat.length; i++) {
-    if (!idSet.has(flat[i].id)) continue;
-    shiftIds.add(flat[i].id);
-    if (!withChildren) continue;
-    const baseDepth = flat[i].headingDepth;
-    for (let j = i + 1; j < flat.length; j++) {
-      if (flat[j].headingDepth <= baseDepth) break;
-      shiftIds.add(flat[j].id);
-    }
-  }
 
   // Validate: a promote is only valid if no shifted node would go below 1;
   // a demote is only valid if no shifted node would exceed MAX_HEADING_DEPTH.
@@ -463,8 +450,23 @@ export const useStore = create<EditorState>()(
   deleteNodes: (nodeIds) => {
     if (nodeIds.length === 0) return 0;
     (get() as any)._pushHistory();
-    const idSet = new Set(nodeIds);
+    const targetIds = new Set(nodeIds);
     const flat = flattenTreeForRebuild(get().tree);
+
+    // Expand targets to include each subtree (consecutive doc-ordered entries
+    // with strictly greater headingDepth) so deletion cascades like the
+    // single-node deleteNode.
+    const idSet = new Set<string>();
+    for (let i = 0; i < flat.length; i++) {
+      if (!targetIds.has(flat[i].id)) continue;
+      idSet.add(flat[i].id);
+      const baseDepth = flat[i].headingDepth;
+      for (let j = i + 1; j < flat.length; j++) {
+        if (flat[j].headingDepth <= baseDepth) break;
+        idSet.add(flat[j].id);
+      }
+    }
+
     const filtered = flat.filter(n => !idSet.has(n.id));
     const removed = flat.length - filtered.length;
     const newTree = rebuildTreeFromFlat(filtered);
@@ -519,12 +521,20 @@ export const useStore = create<EditorState>()(
     const { assessmentConfig } = get();
     const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsedTree) : parsedTree;
     // Par défaut, sélectionner le document complet (H0)
-    set({ tree, markdown, activeNodeId: DOCUMENT_ROOT_ID, history: [], future: [] });
+    set({
+      tree, markdown, activeNodeId: DOCUMENT_ROOT_ID,
+      history: [], future: [],
+      selectedNodeIds: new Set(), lastSelectedNodeId: null, recentlyMovedNodeId: null,
+    });
   },
 
   // Charger un arbre directement (restauration depuis le stockage utilisateur)
   loadTree: (tree: NodeData[]) => {
-    set({ tree, activeNodeId: DOCUMENT_ROOT_ID, history: [], future: [] });
+    set({
+      tree, activeNodeId: DOCUMENT_ROOT_ID,
+      history: [], future: [],
+      selectedNodeIds: new Set(), lastSelectedNodeId: null, recentlyMovedNodeId: null,
+    });
   },
 
   // Sauvegarder l'arbre en Markdown

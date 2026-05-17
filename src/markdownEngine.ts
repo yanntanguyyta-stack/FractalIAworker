@@ -233,9 +233,9 @@ export function flattenTreeForRebuild(tree: NodeData[]): NodeData[] {
 /**
  * Re-builds a tree from a flat doc-ordered list using the same
  * stack-based hierarchy rules as the markdown parser. Each input
- * node's `headingDepth` is the source of truth for nesting.
- *
- * NB: input nodes are mutated (children reset) — pass clones.
+ * node's `headingDepth` is the source of truth for nesting. Inputs
+ * are not mutated — each entry is shallow-cloned with a fresh
+ * `children` array.
  */
 export function rebuildTreeFromFlat(flatNodes: NodeData[]): NodeData[] {
   const tree: NodeData[] = [];
