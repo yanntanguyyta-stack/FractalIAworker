@@ -151,10 +151,12 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Erreur lors de l\'appel IA:', error);
+      // On logge uniquement le message, jamais l'objet brut qui pourrait
+      // contenir une réponse HTTP incluant des fragments de clé API.
       const message = error instanceof Error
         ? error.message
         : 'Erreur: Impossible de communiquer avec l\'IA.';
+      console.error('Erreur lors de l\'appel IA:', message);
       const errorMessage: ChatMessage = {
         role: 'assistant',
         content: message,
