@@ -2,6 +2,7 @@ import React from 'react';
 import { Send, Copy, Check, Settings, MessageSquare, FileText, Zap, ChevronDown, Plus, ChevronRight } from 'lucide-react';
 import { useStore, ChatMode, DOCUMENT_ROOT_ID } from '../store';
 import { buildContextSandwich, buildSystemPrompt, buildUserMessage, callAIAPI, parseAIResponse, ParsedAIResponse, SubsectionProposal } from '../aiService';
+import { extractHeadingSections } from '../utils/markdownSections';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -38,33 +39,6 @@ const promptTemplates = [
   { icon: '🥧', label: 'Graphique circulaire', prompt: 'Génère un diagramme Mermaid de type pie pour représenter les proportions ou répartitions mentionnées.', category: 'mermaid' },
   { icon: '🔄', label: 'État/Transitions', prompt: 'Génère un diagramme Mermaid de type stateDiagram-v2 pour représenter les différents états et transitions.', category: 'mermaid' },
 ];
-
-// Extrait les sections (titre + contenu) depuis du markdown brut.
-// Seuls les headings au niveau minimal (le plus haut) deviennent des nœuds frères ;
-// les sous-headings restent dans le contenu de leur section parente.
-function extractHeadingSections(markdown: string): { heading: string; content: string }[] {
-  const lines = markdown.split('\n');
-  const depths = lines
-    .map(l => l.match(/^(#{1,6})\s+/)?.[1].length)
-    .filter((d): d is number => d !== undefined);
-  if (depths.length === 0) return [];
-  const minDepth = Math.min(...depths);
-  const topPattern = new RegExp(`^#{${minDepth}}\\s+(.+)`);
-
-  const sections: { heading: string; content: string }[] = [];
-  let current: { heading: string; content: string } | null = null;
-  for (const line of lines) {
-    const m = line.match(topPattern);
-    if (m) {
-      if (current) sections.push({ ...current, content: current.content.trim() });
-      current = { heading: m[1].trim(), content: '' };
-    } else if (current) {
-      current.content += line + '\n';
-    }
-  }
-  if (current) sections.push({ ...current, content: current.content.trim() });
-  return sections;
-}
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
   const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild, insertSectionsAsChildren, pendingAIPrompt, setPendingAIPrompt, documents, activeDocumentId } = useStore();

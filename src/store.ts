@@ -144,6 +144,35 @@ function generateId(): string {
 
 const MAX_HEADING_DEPTH = 6;
 
+// État transient à réinitialiser à chaque switch de document.
+const TRANSIENT_RESET = {
+  activeNodeId: DOCUMENT_ROOT_ID,
+  selectedNodeIds: new Set<string>(),
+  lastSelectedNodeId: null,
+  recentlyMovedNodeId: null,
+} as const;
+
+// Crée un nouveau NodeData pour une section (used by addChild + insertSectionsAsChildren).
+function createSectionNode(
+  heading: string,
+  headingDepth: number,
+  content: string,
+  assessmentEnabled: boolean
+): NodeData {
+  return {
+    id: generateId(),
+    heading,
+    headingDepth,
+    content,
+    meta: {
+      id: generateId(),
+      type: 'section',
+      evaluation: assessmentEnabled ? { ...defaultEvaluation } : undefined,
+    },
+    children: [],
+  };
+}
+
 function getSubtreeMaxDepth(node: NodeData): number {
   let maxDepth = node.headingDepth;
   for (const child of node.children) {
@@ -551,9 +580,9 @@ export const useStore = create<EditorState>()(
     );
     set({
       documents: updatedDocs,
-      tree, markdown, activeNodeId: DOCUMENT_ROOT_ID,
+      tree, markdown,
       history: [], future: [],
-      selectedNodeIds: new Set(), lastSelectedNodeId: null, recentlyMovedNodeId: null,
+      ...TRANSIENT_RESET,
     });
   },
 
@@ -565,9 +594,9 @@ export const useStore = create<EditorState>()(
     );
     set({
       documents: updatedDocs,
-      tree, activeNodeId: DOCUMENT_ROOT_ID,
+      tree,
       history: [], future: [],
-      selectedNodeIds: new Set(), lastSelectedNodeId: null, recentlyMovedNodeId: null,
+      ...TRANSIENT_RESET,
     });
   },
 
@@ -662,48 +691,7 @@ export const useStore = create<EditorState>()(
 
   // Ajouter un enfant à un nœud (ou un nœud racine H1 si parentId === DOCUMENT_ROOT_ID)
   addChild: (parentId: string, heading: string, content: string = '') => {
-    const { tree } = get();
-    const { assessmentConfig } = get();
-
-    // Cas spécial : ajouter un nœud racine (H1)
-    if (parentId === DOCUMENT_ROOT_ID) {
-      (get() as any)._pushHistory();
-      const newNode: NodeData = {
-        id: generateId(),
-        heading,
-        headingDepth: 1,
-        content,
-        meta: {
-          id: generateId(),
-          type: 'section',
-          evaluation: assessmentConfig.enabled ? { ...defaultEvaluation } : undefined,
-        },
-        children: [],
-      };
-      set({ tree: [...tree, newNode] });
-      return;
-    }
-
-    const parent = findNodeById(tree, parentId);
-    if (parent) {
-      (get() as any)._pushHistory();
-      const newNode: NodeData = {
-        id: generateId(),
-        heading,
-        headingDepth: parent.headingDepth + 1,
-        content,
-        meta: {
-          id: generateId(),
-          type: 'section',
-          evaluation: assessmentConfig.enabled ? { ...defaultEvaluation } : undefined,
-        },
-        children: [],
-      };
-      const updated = updateNodeInTree(tree, parentId, {
-        children: [...parent.children, newNode],
-      });
-      set({ tree: updated });
-    }
+    (get() as any).insertSectionsAsChildren(parentId, [{ heading, content }]);
   },
 
   // Insérer plusieurs sections comme enfants en une seule opération (un seul undo)
@@ -711,36 +699,26 @@ export const useStore = create<EditorState>()(
     if (sections.length === 0) return;
     const { tree, assessmentConfig } = get();
 
-    const childDepth = parentId === DOCUMENT_ROOT_ID
-      ? 1
-      : (() => { const p = findNodeById(tree, parentId); return p ? p.headingDepth + 1 : 1; })();
+    const isRoot = parentId === DOCUMENT_ROOT_ID;
+    const parent = isRoot ? null : findNodeById(tree, parentId);
+    if (!isRoot && !parent) return;
 
+    const childDepth = isRoot ? 1 : parent!.headingDepth + 1;
     (get() as any)._pushHistory();
 
-    const newChildren: NodeData[] = sections.map(s => ({
-      id: generateId(),
-      heading: s.heading,
-      headingDepth: childDepth,
-      content: s.content,
-      meta: {
-        id: generateId(),
-        type: 'section' as const,
-        evaluation: assessmentConfig.enabled ? { ...defaultEvaluation } : undefined,
-      },
-      children: [],
-    }));
+    const newChildren = sections.map(s =>
+      createSectionNode(s.heading, childDepth, s.content, assessmentConfig.enabled)
+    );
 
-    if (parentId === DOCUMENT_ROOT_ID) {
+    if (isRoot) {
       set({ tree: [...tree, ...newChildren] });
       return;
     }
-
-    const parent = findNodeById(tree, parentId);
-    if (!parent) return;
-    const updated = updateNodeInTree(tree, parentId, {
-      children: [...parent.children, ...newChildren],
+    set({
+      tree: updateNodeInTree(tree, parentId, {
+        children: [...parent!.children, ...newChildren],
+      }),
     });
-    set({ tree: updated });
   },
 
   // Supprimer un nœud
@@ -903,10 +881,7 @@ export const useStore = create<EditorState>()(
       markdown: '',
       history: [],
       future: [],
-      activeNodeId: DOCUMENT_ROOT_ID,
-      selectedNodeIds: new Set(),
-      lastSelectedNodeId: null,
-      recentlyMovedNodeId: null,
+      ...TRANSIENT_RESET,
     });
   },
 
@@ -923,10 +898,7 @@ export const useStore = create<EditorState>()(
       markdown: target.markdown,
       history: target.history,
       future: target.future,
-      activeNodeId: DOCUMENT_ROOT_ID,
-      selectedNodeIds: new Set(),
-      lastSelectedNodeId: null,
-      recentlyMovedNodeId: null,
+      ...TRANSIENT_RESET,
     });
   },
 
@@ -955,10 +927,7 @@ export const useStore = create<EditorState>()(
       markdown: nextDoc.markdown,
       history: nextDoc.history,
       future: nextDoc.future,
-      activeNodeId: DOCUMENT_ROOT_ID,
-      selectedNodeIds: new Set(),
-      lastSelectedNodeId: null,
-      recentlyMovedNodeId: null,
+      ...TRANSIENT_RESET,
     });
   },
 
@@ -982,10 +951,7 @@ export const useStore = create<EditorState>()(
       markdown,
       history: [],
       future: [],
-      activeNodeId: DOCUMENT_ROOT_ID,
-      selectedNodeIds: new Set(),
-      lastSelectedNodeId: null,
-      recentlyMovedNodeId: null,
+      ...TRANSIENT_RESET,
     });
   },
 
