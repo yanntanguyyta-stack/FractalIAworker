@@ -4,7 +4,7 @@ import { exportProjectToZip, buildProjectZip } from '../utils/projectExport';
 import { ProjectDocument } from '../store';
 
 function makeDoc(id: string, name: string, markdown: string): ProjectDocument {
-  return { id, name, markdown, tree: [], history: [], future: [], contextDocIds: [] };
+  return { id, name, markdown, tree: [], history: [], future: [], contextDocIds: [], type: 'tool' };
 }
 
 // jsdom Blob has no arrayBuffer() — we round-trip via uint8array instead.

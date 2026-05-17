@@ -7,8 +7,10 @@ import { useStore } from '../store';
 beforeEach(() => {
   const defaultDocId = 'test-doc';
   useStore.setState({
-    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [], contextDocIds: [] }],
+    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'main' }],
     activeDocumentId: defaultDocId,
+    projects: [{ id: "proj-default", name: "Mon projet", createdAt: 0, documents: [{ id: defaultDocId, name: "Document", tree: [], markdown: "", history: [], future: [], contextDocIds: [], type: "main" }], activeDocumentId: defaultDocId }],
+    activeProjectId: "proj-default",
     tree: [],
     activeNodeId: null,
     markdown: '',
@@ -94,28 +96,22 @@ Contenu enfant`);
   it('devrait ajouter un enfant quand on clique sur le bouton plus', async () => {
     // Mock window.prompt to return a title for the new child
     vi.spyOn(window, 'prompt').mockReturnValue('Nouveau nœud');
-    
+
     useStore.getState().loadMarkdown(`# Parent
 
 Contenu`);
-    
+
     render(<Sidebar />);
-    
-    // Survoler le nœud pour voir les boutons (ils apparaissent au hover)
-    const nodeItem = screen.getByText('Parent').closest('div');
-    if (nodeItem) {
-      fireEvent.mouseEnter(nodeItem);
-    }
-    
-    // Trouver le bouton d'ajout (icône Plus)
-    const addButtons = screen.getAllByRole('button');
-    const addButton = addButtons.find(btn => 
-      btn.querySelector('svg.lucide-plus')
-    );
-    
+
+    // Sélectionner le nœud pour afficher sa barre d'actions
+    fireEvent.click(screen.getByText('Parent'));
+
+    // Trouver le bouton d'ajout de sous-nœud (data-tooltip="Ajouter H2")
+    const addButton = document.querySelector('[data-tooltip="Ajouter H2"]');
+
     if (addButton) {
       fireEvent.click(addButton);
-      
+
       // Vérifier qu'un enfant a été ajouté
       expect(useStore.getState().tree[0].children.length).toBeGreaterThan(0);
     }
@@ -341,30 +337,29 @@ Contenu`);
     expect(screen.getByTitle(/Agent: Expert/i)).toBeInTheDocument();
   });
 
-  describe('document tabs', () => {
-    it('affiche un onglet par document', () => {
+  describe('tool docs section', () => {
+    it('affiche les documents outils dans la section Documents outils', () => {
       useStore.setState({
         documents: [
-          { id: 'd1', name: 'Manuscrit', tree: [], markdown: '', history: [], future: [], contextDocIds: [] },
-          { id: 'd2', name: 'Personnages', tree: [], markdown: '', history: [], future: [], contextDocIds: [] },
+          { id: 'd1', name: 'Manuscrit', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'main' },
+          { id: 'd2', name: 'Personnages', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'tool' },
         ],
         activeDocumentId: 'd1',
       } as any);
 
       render(<Sidebar />);
-      expect(screen.getByText('Manuscrit')).toBeInTheDocument();
       expect(screen.getByText('Personnages')).toBeInTheDocument();
     });
 
-    it('switche de document au clic sur un onglet', () => {
+    it('switche vers un document outil au clic', () => {
       useStore.setState({
         documents: [
-          { id: 'd1', name: 'A', tree: [], markdown: '# A', history: [], future: [], contextDocIds: [] },
-          { id: 'd2', name: 'B', tree: [], markdown: '# B', history: [], future: [], contextDocIds: [] },
+          { id: 'd1', name: 'A', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'main' },
+          { id: 'd2', name: 'B', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'tool' },
         ],
         activeDocumentId: 'd1',
         tree: [],
-        markdown: '# A',
+        markdown: '',
       } as any);
 
       render(<Sidebar />);
@@ -372,46 +367,55 @@ Contenu`);
       expect(useStore.getState().activeDocumentId).toBe('d2');
     });
 
-    it('crée un nouveau document via le bouton +', () => {
+    it('crée un document outil via le bouton Ajouter', () => {
       render(<Sidebar />);
-      const addBtn = screen.getByTitle(/Ajouter un document/i);
+      const addBtn = screen.getByText(/Ajouter un document outil/i);
       fireEvent.click(addBtn);
       expect(useStore.getState().documents).toHaveLength(2);
+      expect(useStore.getState().documents[1].type).toBe('tool');
     });
 
-    it('passe en mode renommage au double-clic sur un onglet', () => {
-      render(<Sidebar />);
-      fireEvent.doubleClick(screen.getByText('Document'));
-      // L'input de rename apparaît, plafonné à MAX_DOCUMENT_NAME_LENGTH
-      const input = document.querySelector('input[maxlength="60"]');
-      expect(input).not.toBeNull();
-    });
-
-    it('supprime un document via le bouton × (avec confirm)', () => {
-      const originalConfirm = window.confirm;
-      window.confirm = vi.fn(() => true);
-
+    it('passe en mode renommage via le bouton Renommer', () => {
       useStore.setState({
         documents: [
-          { id: 'd1', name: 'A', tree: [], markdown: '', history: [], future: [], contextDocIds: [] },
-          { id: 'd2', name: 'B', tree: [], markdown: '', history: [], future: [], contextDocIds: [] },
+          { id: 'd1', name: 'Main', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'main' },
+          { id: 'd2', name: 'Outil', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'tool' },
         ],
         activeDocumentId: 'd1',
       } as any);
 
       render(<Sidebar />);
-      const closeButtons = screen.getAllByTitle(/Supprimer ce document/i);
-      // Cliquer sur le × du document B
-      fireEvent.click(closeButtons[1]);
+      const renameBtn = screen.getByTitle('Renommer');
+      fireEvent.click(renameBtn);
+      const input = document.querySelector('input[maxlength="60"]');
+      expect(input).not.toBeNull();
+    });
+
+    it('supprime un document outil via le bouton Supprimer (avec confirm)', () => {
+      const originalConfirm = window.confirm;
+      window.confirm = vi.fn(() => true);
+
+      useStore.setState({
+        documents: [
+          { id: 'd1', name: 'Main', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'main' },
+          { id: 'd2', name: 'Outil', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'tool' },
+        ],
+        activeDocumentId: 'd1',
+      } as any);
+
+      render(<Sidebar />);
+      const deleteBtn = screen.getByTitle('Supprimer ce document');
+      fireEvent.click(deleteBtn);
       expect(useStore.getState().documents).toHaveLength(1);
       expect(useStore.getState().documents[0].id).toBe('d1');
 
       window.confirm = originalConfirm;
     });
 
-    it('ne montre pas le bouton × quand un seul document existe', () => {
+    it('n\'affiche aucun document dans la section outils s\'il n\'y en a pas', () => {
       render(<Sidebar />);
-      expect(screen.queryByTitle(/Supprimer ce document/i)).toBeNull();
+      expect(screen.queryByTitle('Supprimer ce document')).toBeNull();
+      expect(screen.getByText(/Aucun document outil/i)).toBeInTheDocument();
     });
   });
 });

@@ -4,8 +4,10 @@ import { useStore } from '../store';
 beforeEach(() => {
   const defaultDocId = 'test-doc';
   useStore.setState({
-    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [], contextDocIds: [] }],
+    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [], contextDocIds: [], type: 'main' }],
     activeDocumentId: defaultDocId,
+    projects: [{ id: "proj-default", name: "Mon projet", createdAt: 0, documents: [{ id: defaultDocId, name: "Document", tree: [], markdown: "", history: [], future: [], contextDocIds: [], type: "main" }], activeDocumentId: defaultDocId }],
+    activeProjectId: "proj-default",
     tree: [],
     activeNodeId: null,
     selectedNodeIds: new Set(),
