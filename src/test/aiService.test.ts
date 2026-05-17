@@ -166,6 +166,33 @@ describe('aiService', () => {
 
       expect(result.globalContext).toContain('Global Child');
     });
+
+    it('injecte les documents additionnels dans le contexte global', () => {
+      const node = createTestNode();
+      const result = buildContextSandwich([node], node, [
+        { name: 'Personnages', markdown: '# Alice\n\nbrave' },
+        { name: 'Décors', markdown: '# Forêt' },
+      ]);
+
+      expect(result.globalContext).toContain('Documents additionnels');
+      expect(result.globalContext).toContain('Personnages');
+      expect(result.globalContext).toContain('Alice');
+      expect(result.globalContext).toContain('Décors');
+    });
+
+    it('marque les documents additionnels vides comme "(vide)"', () => {
+      const node = createTestNode();
+      const result = buildContextSandwich([node], node, [
+        { name: 'Brouillon', markdown: '   ' },
+      ]);
+      expect(result.globalContext).toContain('(vide)');
+    });
+
+    it('omet la section "Documents additionnels" quand aucune fournie', () => {
+      const node = createTestNode();
+      const result = buildContextSandwich([node], node);
+      expect(result.globalContext).not.toContain('Documents additionnels');
+    });
   });
 
   describe('buildSystemPrompt', () => {

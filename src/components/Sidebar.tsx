@@ -1,10 +1,11 @@
 import React from 'react';
 import {
   ChevronDown, ChevronRight, Plus, FilePlus, Trash2, FolderTree, Copy, ClipboardPaste,
-  GripVertical, Search, Undo2, Redo2, FileText, Pencil, X,
+  GripVertical, Search, Undo2, Redo2, FileText, Pencil, X, Download,
   ChevronUp as LevelUp, ChevronDown as LevelDown, Sparkles,
 } from 'lucide-react';
-import { useStore, DOCUMENT_ROOT_ID, ProjectDocument } from '../store';
+import { useStore, DOCUMENT_ROOT_ID, ProjectDocument, MAX_DOCUMENT_NAME_LENGTH } from '../store';
+import { exportProjectToZip } from '../utils/projectExport';
 import { NodeData } from '../types';
 import {
   countAllNodes,
@@ -56,6 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     recentlyMovedNodeId, clearRecentlyMoved, promoteNodes, demoteNodes,
     deleteNodes,
     documents, activeDocumentId, createDocument, switchDocument, renameDocument, deleteDocument,
+    switchToAdjacentDocument,
   } = useStore();
   const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
@@ -129,6 +131,36 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     const timer = window.setTimeout(() => clearRecentlyMoved(), 800);
     return () => window.clearTimeout(timer);
   }, [recentlyMovedNodeId, clearRecentlyMoved]);
+
+  // Raccourci clavier Ctrl+Tab / Ctrl+Shift+Tab pour naviguer entre les documents
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.key !== 'Tab') return;
+      // Ne pas intercepter si l'utilisateur est en train de renommer
+      if (renamingDocId) return;
+      e.preventDefault();
+      switchToAdjacentDocument(e.shiftKey ? -1 : 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [switchToAdjacentDocument, renamingDocId]);
+
+  const handleExportProject = async () => {
+    try {
+      const blob = await exportProjectToZip(documents);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.download = `projet-${stamp}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Erreur lors de l\'export du projet : ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
 
   const toggleExpanded = (nodeId: string) => {
     const newExpanded = new Set(expanded);
@@ -469,6 +501,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
               <input
                 ref={renameInputRef}
                 className="w-20 text-xs bg-transparent border-b border-accent-400 outline-none text-slate-900"
+                maxLength={MAX_DOCUMENT_NAME_LENGTH}
                 value={renameValue}
                 onChange={e => setRenameValue(e.target.value)}
                 onBlur={() => commitRename(doc.id)}
@@ -498,9 +531,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         <button
           onClick={() => createDocument('Nouveau document')}
           className="flex-shrink-0 p-1 rounded-lg text-slate-400 hover:text-accent-600 hover:bg-white/50 transition-colors ml-0.5"
-          title="Ajouter un document"
+          title="Ajouter un document (Ctrl+Tab pour naviguer)"
         >
           <FilePlus size={13} />
+        </button>
+        <button
+          onClick={handleExportProject}
+          className="flex-shrink-0 p-1 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-white/50 transition-colors"
+          title="Exporter le projet (ZIP)"
+        >
+          <Download size={13} />
         </button>
       </div>
 

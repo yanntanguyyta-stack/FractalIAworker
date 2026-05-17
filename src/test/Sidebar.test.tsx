@@ -7,7 +7,7 @@ import { useStore } from '../store';
 beforeEach(() => {
   const defaultDocId = 'test-doc';
   useStore.setState({
-    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [] }],
+    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [], contextDocIds: [] }],
     activeDocumentId: defaultDocId,
     tree: [],
     activeNodeId: null,
@@ -334,10 +334,84 @@ Contenu`);
 <!-- {"meta":{"id":"agent","type":"section","agentConfig":{"role":"Expert","instructions":"Sois précis"}}} -->
 
 Contenu`);
-    
+
     render(<Sidebar />);
-    
+
     // L'indicateur agent (🤖) devrait être présent
     expect(screen.getByTitle(/Agent: Expert/i)).toBeInTheDocument();
+  });
+
+  describe('document tabs', () => {
+    it('affiche un onglet par document', () => {
+      useStore.setState({
+        documents: [
+          { id: 'd1', name: 'Manuscrit', tree: [], markdown: '', history: [], future: [], contextDocIds: [] },
+          { id: 'd2', name: 'Personnages', tree: [], markdown: '', history: [], future: [], contextDocIds: [] },
+        ],
+        activeDocumentId: 'd1',
+      } as any);
+
+      render(<Sidebar />);
+      expect(screen.getByText('Manuscrit')).toBeInTheDocument();
+      expect(screen.getByText('Personnages')).toBeInTheDocument();
+    });
+
+    it('switche de document au clic sur un onglet', () => {
+      useStore.setState({
+        documents: [
+          { id: 'd1', name: 'A', tree: [], markdown: '# A', history: [], future: [], contextDocIds: [] },
+          { id: 'd2', name: 'B', tree: [], markdown: '# B', history: [], future: [], contextDocIds: [] },
+        ],
+        activeDocumentId: 'd1',
+        tree: [],
+        markdown: '# A',
+      } as any);
+
+      render(<Sidebar />);
+      fireEvent.click(screen.getByText('B'));
+      expect(useStore.getState().activeDocumentId).toBe('d2');
+    });
+
+    it('crée un nouveau document via le bouton +', () => {
+      render(<Sidebar />);
+      const addBtn = screen.getByTitle(/Ajouter un document/i);
+      fireEvent.click(addBtn);
+      expect(useStore.getState().documents).toHaveLength(2);
+    });
+
+    it('passe en mode renommage au double-clic sur un onglet', () => {
+      render(<Sidebar />);
+      fireEvent.doubleClick(screen.getByText('Document'));
+      // L'input de rename apparaît, plafonné à MAX_DOCUMENT_NAME_LENGTH
+      const input = document.querySelector('input[maxlength="60"]');
+      expect(input).not.toBeNull();
+    });
+
+    it('supprime un document via le bouton × (avec confirm)', () => {
+      const originalConfirm = window.confirm;
+      window.confirm = vi.fn(() => true);
+
+      useStore.setState({
+        documents: [
+          { id: 'd1', name: 'A', tree: [], markdown: '', history: [], future: [], contextDocIds: [] },
+          { id: 'd2', name: 'B', tree: [], markdown: '', history: [], future: [], contextDocIds: [] },
+        ],
+        activeDocumentId: 'd1',
+      } as any);
+
+      render(<Sidebar />);
+      const closeButtons = screen.getAllByTitle(/Supprimer ce document/i);
+      // Cliquer sur le × du document B
+      fireEvent.click(closeButtons[1]);
+      expect(useStore.getState().documents).toHaveLength(1);
+      expect(useStore.getState().documents[0].id).toBe('d1');
+
+      window.confirm = originalConfirm;
+    });
+
+    it('ne montre pas le bouton × quand un seul document existe', () => {
+      render(<Sidebar />);
+      expect(screen.queryByTitle(/Supprimer ce document/i)).toBeNull();
+    });
   });
 });
