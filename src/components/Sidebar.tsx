@@ -52,6 +52,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     tree, activeNodeId, selectNode, addChild, deleteNode, copyNode, pasteNode,
     moveNode, clipboardNode, undo, redo, canUndo, canRedo, promoteNode,
     demoteNode, selectDocumentRoot, updateNodeHeading, setPendingAIPrompt,
+    selectedNodeIds, toggleNodeSelection, selectRangeTo, clearSelection,
+    recentlyMovedNodeId, clearRecentlyMoved, promoteNodes, demoteNodes,
+    deleteNodes,
   } = useStore();
   const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
@@ -95,6 +98,19 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     }
   }, [tree]);
 
+  // Scroll the recently-moved node into view + clear the marker after the
+  // glow-pulse animation (~700ms). The pulse class is gated on the marker
+  // in renderNode.
+  React.useEffect(() => {
+    if (!recentlyMovedNodeId) return;
+    const el = document.querySelector(`[data-node-id="${recentlyMovedNodeId}"]`);
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    const timer = window.setTimeout(() => clearRecentlyMoved(), 800);
+    return () => window.clearTimeout(timer);
+  }, [recentlyMovedNodeId, clearRecentlyMoved]);
+
   const toggleExpanded = (nodeId: string) => {
     const newExpanded = new Set(expanded);
     if (newExpanded.has(nodeId)) newExpanded.delete(nodeId);
@@ -123,31 +139,59 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     }
   };
 
-  const renderNode = (node: NodeData, depth: number = 0) => {
+  const renderNode = (node: NodeData, treeDepth: number = 0, parentHeadingDepth: number = 0) => {
     const isExpanded = effectiveExpanded.has(node.id);
     const hasChildren = node.children.length > 0;
     const isActive = activeNodeId === node.id;
-    const colorIndex = Math.min(depth, depthBorder.length - 1);
+    const isSelected = selectedNodeIds.has(node.id);
+    const isRecentlyMoved = recentlyMovedNodeId === node.id;
+    // Visual indentation follows the HEADING level (H1=0, H2=1, …), not the
+    // tree-walk depth. Two H3 siblings under different parents always end up
+    // at the same indent — the chip and the indent stay consistent even when
+    // the markdown skips levels.
+    const indentLevel = Math.max(0, node.headingDepth - 1);
+    const colorIndex = Math.min(indentLevel, depthBorder.length - 1);
     const dragHandlers = getNodeHandlers(node.id);
     const incomplete = isNodeIncomplete(node);
+    // Skip-level: heading deeper than parent + 1 (or > 1 with no parent)
+    const expectedDepth = parentHeadingDepth === 0 ? 1 : parentHeadingDepth + 1;
+    const skipsLevel = node.headingDepth > expectedDepth;
+
+    const handleRowClick = (e: React.MouseEvent) => {
+      if (e.shiftKey) {
+        e.preventDefault();
+        selectRangeTo(node.id);
+      } else if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        toggleNodeSelection(node.id);
+      } else {
+        if (selectedNodeIds.size > 0) clearSelection();
+        selectNode(node.id);
+      }
+    };
 
     return (
       <div key={node.id} className="select-none sidebar-node-item">
         <div className="relative">
-          {depth > 0 && (
+          {indentLevel > 0 && (
             <div
               className="absolute top-0 bottom-0 w-px bg-slate-200/60"
-              style={{ left: `${(depth - 1) * 16 + 14}px` }}
+              style={{ left: `${(indentLevel - 1) * 16 + 14}px` }}
             />
           )}
           <div
+            data-node-id={node.id}
             className={`group flex items-center gap-1.5 pl-2 pr-2 py-1.5 cursor-pointer rounded-xl transition-all duration-200 ease-spring border-l-2 ${
-              isActive
-                ? `${depthActiveBg[colorIndex]} ${depthBorder[colorIndex]} shadow-soft`
-                : 'border-transparent hover:bg-white/60'
-            } ${dragHandlers.isDropTarget ? 'ring-2 ring-accent-400/60' : ''}`}
-            style={{ marginLeft: `${depth * 16}px` }}
-            onClick={() => selectNode(node.id)}
+              isSelected
+                ? 'bg-accent-100/70 border-accent-500 ring-1 ring-accent-300'
+                : isActive
+                  ? `${depthActiveBg[colorIndex]} ${depthBorder[colorIndex]} shadow-soft`
+                  : 'border-transparent hover:bg-white/60'
+            } ${dragHandlers.isDropTarget ? 'ring-2 ring-accent-400/60' : ''} ${
+              isRecentlyMoved ? 'animate-glow-pulse' : ''
+            }`}
+            style={{ marginLeft: `${indentLevel * 16}px` }}
+            onClick={handleRowClick}
             draggable={dragHandlers.draggable}
             onDragStart={dragHandlers.onDragStart}
             onDragEnd={dragHandlers.onDragEnd}
@@ -175,6 +219,15 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${depthChipBg[colorIndex]} flex-shrink-0 tracking-wider`}>
               H{node.headingDepth}
             </span>
+
+            {skipsLevel && (
+              <span
+                className="text-[9px] font-bold px-1 py-0.5 bg-amber-100 text-amber-700 rounded flex-shrink-0 tooltip-wrapper"
+                data-tooltip={`Saut de niveau (attendu H${expectedDepth})`}
+              >
+                ⚠
+              </span>
+            )}
 
             <span className={`flex-1 truncate text-sm leading-tight ${isActive ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
               {matchIds.has(node.id) ? highlightMatch(node.heading || '(Sans titre)', trimmedSearch) : node.heading || '(Sans titre)'}
@@ -206,7 +259,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         {isActive && (
           <div
             className="flex items-center gap-0.5 px-1.5 py-1 mx-1 mb-1 mt-1 bg-white/70 backdrop-blur-md rounded-xl border border-white/80 shadow-soft flex-wrap animate-fade-in-down"
-            style={{ marginLeft: `${depth * 16 + 8}px` }}
+            style={{ marginLeft: `${indentLevel * 16 + 8}px` }}
           >
             {node.headingDepth < 6 && (
               <button
@@ -322,7 +375,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
         {hasChildren && isExpanded && (
           <div className="relative">
-            {node.children.map((child: NodeData) => renderNode(child, depth + 1))}
+            {node.children.map((child: NodeData) => renderNode(child, treeDepth + 1, node.headingDepth))}
           </div>
         )}
       </div>
@@ -356,6 +409,26 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
   const historyCanUndo = canUndo();
   const historyCanRedo = canRedo();
+
+  const selectionCount = selectedNodeIds.size;
+  const selectedIdsArray = React.useMemo(() => Array.from(selectedNodeIds), [selectedNodeIds]);
+
+  const handleBulkPromote = () => {
+    const { ok, skipped } = promoteNodes(selectedIdsArray, true);
+    if (ok === 0 && skipped > 0) {
+      alert('Aucun nœud n\'a pu être promu (déjà à H1 ou limite atteinte).');
+    }
+  };
+  const handleBulkDemote = () => {
+    const { ok, skipped } = demoteNodes(selectedIdsArray, true);
+    if (ok === 0 && skipped > 0) {
+      alert('Aucun nœud n\'a pu être rétrogradé (profondeur maximale atteinte).');
+    }
+  };
+  const handleBulkDelete = () => {
+    if (!confirm(`Supprimer ${selectionCount} nœud${selectionCount > 1 ? 's' : ''} et tous leurs enfants ?`)) return;
+    deleteNodes(selectedIdsArray);
+  };
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
@@ -452,6 +525,47 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
           </div>
         )}
       </div>
+
+      {selectionCount >= 2 && (
+        <div className="flex-shrink-0 mx-2 mt-2 mb-1 p-2 glass-strong rounded-xl flex items-center gap-1.5 animate-fade-in-down shadow-glass">
+          <span className="text-[11px] font-bold tracking-wide text-accent-700 mr-1 ml-1">
+            {selectionCount} sélectionnés
+          </span>
+          <button
+            onClick={handleBulkPromote}
+            className="icon-btn-sm tooltip-wrapper text-amber-600 hover:bg-amber-50 px-1.5 gap-0.5 w-auto"
+            data-tooltip="Promouvoir tout"
+            title="Promouvoir"
+          >
+            <LevelUp size={13} />
+          </button>
+          <button
+            onClick={handleBulkDemote}
+            className="icon-btn-sm tooltip-wrapper text-orange-600 hover:bg-orange-50 px-1.5 gap-0.5 w-auto"
+            data-tooltip="Rétrograder tout"
+            title="Rétrograder"
+          >
+            <LevelDown size={13} />
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            className="icon-btn-sm tooltip-wrapper text-rose-600 hover:bg-rose-50"
+            data-tooltip="Supprimer tout"
+            title="Supprimer"
+          >
+            <Trash2 size={13} />
+          </button>
+          <div className="flex-1" />
+          <button
+            onClick={clearSelection}
+            className="icon-btn-sm tooltip-wrapper"
+            data-tooltip="Désélectionner"
+            title="Désélectionner"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       <div
         className="flex-1 overflow-y-auto min-h-0 px-2 pb-2"
