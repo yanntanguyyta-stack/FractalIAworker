@@ -33,6 +33,9 @@ interface HistorySnapshot {
   activeNodeId: string | null;
 }
 
+// 'main' = document principal du projet (unique), 'tool' = document outil
+export type DocumentType = 'main' | 'tool';
+
 // Un document dans le projet (chaque onglet)
 export interface ProjectDocument {
   id: string;
@@ -43,18 +46,33 @@ export interface ProjectDocument {
   future: HistorySnapshot[];
   // IDs des autres documents à injecter en contexte IA (manuel, persisté par doc)
   contextDocIds: string[];
+  type: DocumentType;
+}
+
+// Conteneur nommé regroupant plusieurs documents
+export interface Project {
+  id: string;
+  name: string;
+  createdAt: number;
+  documents: ProjectDocument[];
+  activeDocumentId: string;
 }
 
 const MAX_HISTORY_SIZE = 50;
 // Borne plus serrée pour ce qui est persisté en localStorage (quota ~5 Mo).
 const MAX_PERSISTED_HISTORY = 20;
 export const MAX_DOCUMENT_NAME_LENGTH = 60;
+export const MAX_PROJECT_NAME_LENGTH = 60;
 
 // ID spécial pour le nœud H0 (document global)
 export const DOCUMENT_ROOT_ID = '__document_root__';
 
 interface EditorState {
-  // Projet multi-documents
+  // Projets
+  projects: Project[];
+  activeProjectId: string;
+
+  // Documents du projet actif (miroir de projects[activeProjectId].documents)
   documents: ProjectDocument[];
   activeDocumentId: string;
 
@@ -126,14 +144,21 @@ interface EditorState {
   setChatMode: (mode: ChatMode) => void;
   setPendingAIPrompt: (prompt: string | null) => void;
 
-  // Actions Multi-documents
-  createDocument: (name: string) => void;
+  // Actions Multi-documents (dans le projet actif)
+  createDocument: (name: string, type?: DocumentType) => void;
   switchDocument: (id: string) => void;
   switchToAdjacentDocument: (direction: 1 | -1) => void;
   renameDocument: (id: string, name: string) => void;
   deleteDocument: (id: string) => void;
   importAsDocument: (name: string, markdown: string) => boolean;
   setDocumentContextIds: (docId: string, contextIds: string[]) => void;
+  setDocumentType: (docId: string, type: DocumentType) => void;
+
+  // Actions Projet
+  createProject: (name: string) => void;
+  switchProject: (id: string) => void;
+  renameProject: (id: string, name: string) => void;
+  deleteProject: (id: string) => void;
 
   // Helpers internes (exposés pour le typage, à usage interne uniquement)
   _pushHistory: () => void;
@@ -414,8 +439,19 @@ export const useStore = create<EditorState>()(
   persist(
     (set, get) => {
       const defaultDocId = generateId();
+      const defaultProjectId = generateId();
+      const defaultDoc: ProjectDocument = {
+        id: defaultDocId, name: 'Document', tree: [], markdown: '',
+        history: [], future: [], contextDocIds: [], type: 'main',
+      };
+      const defaultProject: Project = {
+        id: defaultProjectId, name: 'Mon projet', createdAt: Date.now(),
+        documents: [defaultDoc], activeDocumentId: defaultDocId,
+      };
       return ({
-      documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [], contextDocIds: [] }],
+      projects: [defaultProject],
+      activeProjectId: defaultProjectId,
+      documents: [defaultDoc],
       activeDocumentId: defaultDocId,
       tree: [],
       activeNodeId: null,
@@ -864,16 +900,21 @@ export const useStore = create<EditorState>()(
 
   // ── Multi-documents ──────────────────────────────────────────────────────
 
-  // Sauvegarde l'état courant dans le tableau documents (appelé avant tout switch)
+  // Sauvegarde l'état courant dans documents[] et synchronise dans projects[].
   _saveCurrentDocSnapshot: () => {
-    const { documents, activeDocumentId, tree, markdown, history, future } = get();
-    const updated = documents.map(d =>
+    const { documents, activeDocumentId, tree, markdown, history, future, projects, activeProjectId } = get();
+    const updatedDocs = documents.map(d =>
       d.id === activeDocumentId ? { ...d, tree, markdown, history, future } : d
     );
-    set({ documents: updated });
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId
+        ? { ...p, documents: updatedDocs, activeDocumentId }
+        : p
+    );
+    set({ documents: updatedDocs, projects: updatedProjects });
   },
 
-  createDocument: (name: string) => {
+  createDocument: (name: string, type: DocumentType = 'tool') => {
     get()._saveCurrentDocSnapshot();
     const trimmedName = name.trim().slice(0, MAX_DOCUMENT_NAME_LENGTH) || 'Sans titre';
     const newDoc: ProjectDocument = {
@@ -884,10 +925,16 @@ export const useStore = create<EditorState>()(
       history: [],
       future: [],
       contextDocIds: [],
+      type,
     };
-    const { documents } = get();
+    const { documents, projects, activeProjectId } = get();
+    const updatedDocs = [...documents, newDoc];
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId ? { ...p, documents: updatedDocs, activeDocumentId: newDoc.id } : p
+    );
     set({
-      documents: [...documents, newDoc],
+      documents: updatedDocs,
+      projects: updatedProjects,
       activeDocumentId: newDoc.id,
       tree: [],
       markdown: '',
@@ -901,11 +948,15 @@ export const useStore = create<EditorState>()(
     const { activeDocumentId } = get();
     if (id === activeDocumentId) return;
     get()._saveCurrentDocSnapshot();
-    const { documents } = get();
+    const { documents, projects, activeProjectId } = get();
     const target = documents.find(d => d.id === id);
     if (!target) return;
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId ? { ...p, activeDocumentId: id } : p
+    );
     set({
       activeDocumentId: id,
+      projects: updatedProjects,
       tree: target.tree,
       markdown: target.markdown,
       history: target.history,
@@ -926,32 +977,41 @@ export const useStore = create<EditorState>()(
 
   renameDocument: (id: string, name: string) => {
     get()._saveCurrentDocSnapshot();
-    const { documents } = get();
+    const { documents, projects, activeProjectId } = get();
     const trimmed = name.trim().slice(0, MAX_DOCUMENT_NAME_LENGTH);
-    if (!trimmed) return; // nom vide refusé
-    set({ documents: documents.map(d => d.id === id ? { ...d, name: trimmed } : d) });
+    if (!trimmed) return;
+    const updatedDocs = documents.map(d => d.id === id ? { ...d, name: trimmed } : d);
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId ? { ...p, documents: updatedDocs } : p
+    );
+    set({ documents: updatedDocs, projects: updatedProjects });
   },
 
   deleteDocument: (id: string) => {
-    const { documents, activeDocumentId } = get();
-    if (documents.length <= 1) return; // garder au moins 1 document
+    const { documents, activeDocumentId, projects, activeProjectId } = get();
+    if (documents.length <= 1) return;
     get()._saveCurrentDocSnapshot();
     const remaining = documents.filter(d => d.id !== id);
-    // Nettoyer les références contextDocIds qui pointent vers le document supprimé
     const cleaned = remaining.map(d =>
       d.contextDocIds.includes(id)
         ? { ...d, contextDocIds: d.contextDocIds.filter(cid => cid !== id) }
         : d
     );
     if (id !== activeDocumentId) {
-      set({ documents: cleaned });
+      const updatedProjects = projects.map(p =>
+        p.id === activeProjectId ? { ...p, documents: cleaned } : p
+      );
+      set({ documents: cleaned, projects: updatedProjects });
       return;
     }
-    // Switcher vers le document précédent ou premier restant
     const deletedIndex = documents.findIndex(d => d.id === id);
     const nextDoc = cleaned[Math.max(0, deletedIndex - 1)];
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId ? { ...p, documents: cleaned, activeDocumentId: nextDoc.id } : p
+    );
     set({
       documents: cleaned,
+      projects: updatedProjects,
       activeDocumentId: nextDoc.id,
       tree: nextDoc.tree,
       markdown: nextDoc.markdown,
@@ -961,9 +1021,6 @@ export const useStore = create<EditorState>()(
     });
   },
 
-  // Importer un Markdown comme nouveau document. Renvoie false si le contenu
-  // ne produit aucun nœud et que le markdown brut est vide — le caller peut
-  // alors avertir l'utilisateur au lieu de créer un doc fantôme.
   importAsDocument: (name: string, markdown: string): boolean => {
     const trimmedName = name.trim().slice(0, MAX_DOCUMENT_NAME_LENGTH) || 'Sans titre';
     const trimmedMd = markdown.trim();
@@ -971,7 +1028,7 @@ export const useStore = create<EditorState>()(
     if (parsed.length === 0 && trimmedMd === '') return false;
 
     get()._saveCurrentDocSnapshot();
-    const { assessmentConfig, documents } = get();
+    const { assessmentConfig, documents, projects, activeProjectId } = get();
     const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsed) : parsed;
     const newDoc: ProjectDocument = {
       id: generateId(),
@@ -981,9 +1038,15 @@ export const useStore = create<EditorState>()(
       history: [],
       future: [],
       contextDocIds: [],
+      type: 'tool',
     };
+    const updatedDocs = [...documents, newDoc];
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId ? { ...p, documents: updatedDocs, activeDocumentId: newDoc.id } : p
+    );
     set({
-      documents: [...documents, newDoc],
+      documents: updatedDocs,
+      projects: updatedProjects,
       activeDocumentId: newDoc.id,
       tree,
       markdown,
@@ -995,13 +1058,110 @@ export const useStore = create<EditorState>()(
   },
 
   setDocumentContextIds: (docId: string, contextIds: string[]) => {
-    const { documents } = get();
-    // Filtrer les IDs invalides : seulement d'autres docs existants.
+    const { documents, projects, activeProjectId } = get();
     const valid = contextIds.filter(id => id !== docId && documents.some(d => d.id === id));
+    const updatedDocs = documents.map(d => d.id === docId ? { ...d, contextDocIds: valid } : d);
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId ? { ...p, documents: updatedDocs } : p
+    );
+    set({ documents: updatedDocs, projects: updatedProjects });
+  },
+
+  // Changer le type d'un document (main/tool).
+  // Passer 'main' rétrograde tous les autres en 'tool' (un seul principal par projet).
+  setDocumentType: (docId: string, type: DocumentType) => {
+    const { documents, projects, activeProjectId } = get();
+    const updatedDocs = documents.map(d => ({
+      ...d,
+      type: d.id === docId ? type : (type === 'main' ? 'tool' : d.type),
+    }));
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId ? { ...p, documents: updatedDocs } : p
+    );
+    set({ documents: updatedDocs, projects: updatedProjects });
+  },
+
+  // ── Multi-projets ─────────────────────────────────────────────────────────
+
+  createProject: (name: string) => {
+    get()._saveCurrentDocSnapshot();
+    const docId = generateId();
+    const newDoc: ProjectDocument = {
+      id: docId, name: 'Document', tree: [], markdown: '',
+      history: [], future: [], contextDocIds: [], type: 'main',
+    };
+    const newProject: Project = {
+      id: generateId(),
+      name: name.trim().slice(0, MAX_PROJECT_NAME_LENGTH) || 'Sans titre',
+      createdAt: Date.now(),
+      documents: [newDoc],
+      activeDocumentId: docId,
+    };
+    const { projects } = get();
     set({
-      documents: documents.map(d =>
-        d.id === docId ? { ...d, contextDocIds: valid } : d
-      ),
+      projects: [...projects, newProject],
+      activeProjectId: newProject.id,
+      documents: newProject.documents,
+      activeDocumentId: docId,
+      tree: [],
+      markdown: '',
+      history: [],
+      future: [],
+      ...TRANSIENT_RESET,
+    });
+  },
+
+  switchProject: (id: string) => {
+    const { activeProjectId } = get();
+    if (id === activeProjectId) return;
+    get()._saveCurrentDocSnapshot();
+    const { projects } = get();
+    const target = projects.find(p => p.id === id);
+    if (!target) return;
+    const activeDoc = target.documents.find(d => d.id === target.activeDocumentId)
+      ?? target.documents[0];
+    set({
+      activeProjectId: id,
+      documents: target.documents,
+      activeDocumentId: activeDoc?.id ?? '',
+      tree: activeDoc?.tree ?? [],
+      markdown: activeDoc?.markdown ?? '',
+      history: activeDoc?.history ?? [],
+      future: activeDoc?.future ?? [],
+      ...TRANSIENT_RESET,
+    });
+  },
+
+  renameProject: (id: string, name: string) => {
+    const trimmed = name.trim().slice(0, MAX_PROJECT_NAME_LENGTH);
+    if (!trimmed) return;
+    const { projects } = get();
+    set({ projects: projects.map(p => p.id === id ? { ...p, name: trimmed } : p) });
+  },
+
+  deleteProject: (id: string) => {
+    const { projects, activeProjectId } = get();
+    if (projects.length <= 1) return;
+    get()._saveCurrentDocSnapshot();
+    const remaining = projects.filter(p => p.id !== id);
+    if (id !== activeProjectId) {
+      set({ projects: remaining });
+      return;
+    }
+    const deletedIndex = projects.findIndex(p => p.id === id);
+    const nextProject = remaining[Math.max(0, deletedIndex - 1)];
+    const activeDoc = nextProject.documents.find(d => d.id === nextProject.activeDocumentId)
+      ?? nextProject.documents[0];
+    set({
+      projects: remaining,
+      activeProjectId: nextProject.id,
+      documents: nextProject.documents,
+      activeDocumentId: activeDoc?.id ?? '',
+      tree: activeDoc?.tree ?? [],
+      markdown: activeDoc?.markdown ?? '',
+      history: activeDoc?.history ?? [],
+      future: activeDoc?.future ?? [],
+      ...TRANSIENT_RESET,
     });
   },
 
@@ -1116,33 +1276,71 @@ export const useStore = create<EditorState>()(
       partialize: (state) => ({
         aiConfig: state.aiConfig,
         assessmentConfig: state.assessmentConfig,
-        // L'historique peut exploser le quota localStorage (~5 Mo) sur un
-        // projet vivant — on cappe ce qu'on persiste, mais on garde l'undo
-        // complet en mémoire (MAX_HISTORY_SIZE).
-        documents: state.documents.map(d => ({
-          ...d,
-          history: d.history.slice(-MAX_PERSISTED_HISTORY),
-          future: d.future.slice(0, MAX_PERSISTED_HISTORY),
+        // Persist projects[] with capped history to stay under localStorage quota.
+        projects: state.projects.map(p => ({
+          ...p,
+          documents: p.documents.map(d => ({
+            ...d,
+            history: d.history.slice(-MAX_PERSISTED_HISTORY),
+            future: d.future.slice(0, MAX_PERSISTED_HISTORY),
+          })),
         })),
-        activeDocumentId: state.activeDocumentId,
+        activeProjectId: state.activeProjectId,
       }),
-      // After rehydration, hydrate the top-level mirror fields from the
-      // active document so the editor doesn't render an empty tree.
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        // Champ ajouté tardivement : garantir contextDocIds = [] pour les
-        // documents persistés avant son introduction.
-        if (state.documents) {
-          state.documents = state.documents.map((d: ProjectDocument) =>
-            d.contextDocIds ? d : { ...d, contextDocIds: [] }
+
+        // ── Migration v1→v2 ──────────────────────────────────────────────────
+        // v1 persisted documents[] + activeDocumentId at top level (no projects).
+        // Wrap them in a single "Mon projet" project.
+        if (!state.projects && (state as any).documents) {
+          const legacyDocs: ProjectDocument[] = ((state as any).documents as any[]).map(
+            (d: any, i: number) => ({
+              ...d,
+              contextDocIds: d.contextDocIds ?? [],
+              type: (i === 0 ? 'main' : 'tool') as DocumentType,
+            })
           );
+          const legacyActiveDocId = (state as any).activeDocumentId ?? legacyDocs[0]?.id ?? '';
+          const migratedProject: Project = {
+            id: generateId(),
+            name: 'Mon projet',
+            createdAt: Date.now(),
+            documents: legacyDocs,
+            activeDocumentId: legacyActiveDocId,
+          };
+          state.projects = [migratedProject];
+          state.activeProjectId = migratedProject.id;
         }
-        const activeDoc = state.documents?.find((d: ProjectDocument) => d.id === state.activeDocumentId);
-        if (activeDoc) {
-          state.tree = activeDoc.tree;
-          state.markdown = activeDoc.markdown;
-          state.history = activeDoc.history;
-          state.future = activeDoc.future;
+
+        // ── Normalisation ────────────────────────────────────────────────────
+        if (state.projects) {
+          state.projects = state.projects.map((p: Project) => ({
+            ...p,
+            documents: p.documents.map((d: ProjectDocument) => ({
+              ...d,
+              contextDocIds: d.contextDocIds ?? [],
+              type: d.type ?? 'tool',
+            })),
+          }));
+        }
+
+        // ── Réhydratation des miroirs ────────────────────────────────────────
+        const activeProject = state.projects?.find(
+          (p: Project) => p.id === state.activeProjectId
+        );
+        if (activeProject) {
+          state.documents = activeProject.documents;
+          state.activeDocumentId = activeProject.activeDocumentId;
+          const activeDoc = activeProject.documents.find(
+            (d: ProjectDocument) => d.id === activeProject.activeDocumentId
+          );
+          if (activeDoc) {
+            state.tree = activeDoc.tree;
+            state.markdown = activeDoc.markdown;
+            state.history = activeDoc.history;
+            state.future = activeDoc.future;
+          }
         }
       },
     }

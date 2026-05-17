@@ -1,11 +1,13 @@
 import React from 'react';
 import {
-  ChevronDown, ChevronRight, Plus, FilePlus, Trash2, FolderTree, Copy, ClipboardPaste,
+  ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste,
   GripVertical, Search, Undo2, Redo2, FileText, Pencil, X, Download,
   ChevronUp as LevelUp, ChevronDown as LevelDown, Sparkles,
+  Wrench, ArrowRight, FolderOpen,
 } from 'lucide-react';
-import { useStore, DOCUMENT_ROOT_ID, ProjectDocument, MAX_DOCUMENT_NAME_LENGTH } from '../store';
+import { useStore, DOCUMENT_ROOT_ID, ProjectDocument, DocumentType } from '../store';
 import { exportProjectToZip } from '../utils/projectExport';
+import ProjectSwitcher from './ProjectSwitcher';
 import { NodeData } from '../types';
 import {
   countAllNodes,
@@ -57,13 +59,22 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     recentlyMovedNodeId, clearRecentlyMoved, promoteNodes, demoteNodes,
     deleteNodes,
     documents, activeDocumentId, createDocument, switchDocument, renameDocument, deleteDocument,
-    switchToAdjacentDocument,
+    switchToAdjacentDocument, setDocumentType,
+    projects, activeProjectId,
   } = useStore();
   const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+  const [showProjectSwitcher, setShowProjectSwitcher] = React.useState(false);
+  const [showToolDocs, setShowToolDocs] = React.useState(true);
   const [renamingDocId, setRenamingDocId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState('');
   const renameInputRef = React.useRef<HTMLInputElement>(null);
+
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const mainDoc = documents.find(d => d.type === 'main') ?? documents[0];
+  const toolDocs = documents.filter(d => d.type === 'tool');
+  const activeDoc = documents.find(d => d.id === activeDocumentId);
+  const isEditingTool = activeDoc?.type === 'tool';
 
   const startRename = (id: string, name: string) => {
     setRenamingDocId(id);
@@ -483,66 +494,49 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
-      {/* ── Onglets Documents ─────────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 px-2 pt-2 pb-1.5 border-b border-white/40 overflow-x-auto flex-shrink-0 min-w-0">
-        {documents.map((doc: ProjectDocument) => (
-          <div
-            key={doc.id}
-            className={`group relative flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-all whitespace-nowrap flex-shrink-0 max-w-[140px] ${
-              doc.id === activeDocumentId
-                ? 'bg-white/90 text-slate-900 shadow-soft border border-white/80'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
-            }`}
-            onClick={() => doc.id !== activeDocumentId && switchDocument(doc.id)}
-            onDoubleClick={() => startRename(doc.id, doc.name)}
-            title={doc.name}
-          >
-            {renamingDocId === doc.id ? (
-              <input
-                ref={renameInputRef}
-                className="w-20 text-xs bg-transparent border-b border-accent-400 outline-none text-slate-900"
-                maxLength={MAX_DOCUMENT_NAME_LENGTH}
-                value={renameValue}
-                onChange={e => setRenameValue(e.target.value)}
-                onBlur={() => commitRename(doc.id)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') commitRename(doc.id);
-                  if (e.key === 'Escape') cancelRename();
-                }}
-                onClick={e => e.stopPropagation()}
-              />
-            ) : (
-              <span className="truncate max-w-[100px]">{doc.name}</span>
-            )}
-            {documents.length > 1 && (
-              <button
-                onClick={e => {
-                  e.stopPropagation();
-                  if (confirm(`Supprimer le document "${doc.name}" ?`)) deleteDocument(doc.id);
-                }}
-                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-red-500 transition-all flex-shrink-0 ml-0.5"
-                title="Supprimer ce document"
-              >
-                <X size={10} />
-              </button>
-            )}
-          </div>
-        ))}
+      {showProjectSwitcher && (
+        <ProjectSwitcher onClose={() => setShowProjectSwitcher(false)} />
+      )}
+
+      {/* ── En-tête projet ────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-2 border-b border-white/40 flex-shrink-0">
         <button
-          onClick={() => createDocument('Nouveau document')}
-          className="flex-shrink-0 p-1 rounded-lg text-slate-400 hover:text-accent-600 hover:bg-white/50 transition-colors ml-0.5"
-          title="Ajouter un document (Ctrl+Tab pour naviguer)"
+          onClick={() => setShowProjectSwitcher(true)}
+          className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-xl hover:bg-white/60 transition-colors text-left group"
+          title="Changer de projet"
         >
-          <FilePlus size={13} />
+          <FolderOpen size={13} className="text-accent-500 flex-shrink-0" />
+          <span className="text-xs font-semibold text-slate-800 truncate flex-1">
+            {activeProject?.name ?? 'Mon projet'}
+          </span>
+          <ChevronDown size={11} className="text-slate-400 group-hover:text-slate-600 flex-shrink-0" />
         </button>
         <button
           onClick={handleExportProject}
-          className="flex-shrink-0 p-1 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-white/50 transition-colors"
+          className="icon-btn-sm tooltip-wrapper text-slate-400 hover:text-emerald-600"
+          data-tooltip="Exporter le projet (ZIP)"
           title="Exporter le projet (ZIP)"
         >
           <Download size={13} />
         </button>
       </div>
+
+      {/* ── Bandeau "retour au document principal" si on édite un outil ── */}
+      {isEditingTool && mainDoc && (
+        <div className="flex-shrink-0 mx-2 mt-2 mb-0 px-3 py-1.5 rounded-xl bg-amber-50/70 border border-amber-200/60 flex items-center gap-2 animate-fade-in">
+          <Wrench size={11} className="text-amber-500 flex-shrink-0" />
+          <span className="text-[11px] text-amber-700 font-medium truncate flex-1">
+            {activeDoc?.name}
+          </span>
+          <button
+            onClick={() => switchDocument(mainDoc.id)}
+            className="flex items-center gap-1 text-[11px] text-accent-600 hover:text-accent-800 font-semibold whitespace-nowrap"
+          >
+            <ArrowRight size={11} />
+            Principal
+          </button>
+        </div>
+      )}
 
       <div className="px-3 pt-3 pb-2 flex-shrink-0 border-b border-white/40">
         <div className="flex items-center justify-between mb-2">
@@ -719,6 +713,94 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         ) : (
           <div className="pt-1">
             {visibleTree.map(node => renderNode(node))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Documents outils ──────────────────────────────────────────── */}
+      <div className="flex-shrink-0 border-t border-white/40">
+        <button
+          onClick={() => setShowToolDocs(v => !v)}
+          className="w-full flex items-center gap-1.5 px-3 py-2 hover:bg-white/50 transition-colors"
+        >
+          <Wrench size={11} className="text-slate-400" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex-1 text-left">
+            Documents outils
+          </span>
+          <span className="text-[10px] text-slate-400 font-mono mr-1">{toolDocs.length}</span>
+          <ChevronRight size={11} className={`text-slate-400 transition-transform ${showToolDocs ? 'rotate-90' : ''}`} />
+        </button>
+
+        {showToolDocs && (
+          <div className="pb-2 px-2 space-y-0.5 animate-fade-in">
+            {toolDocs.length === 0 && (
+              <p className="text-[11px] text-slate-400 text-center py-2">
+                Aucun document outil.
+              </p>
+            )}
+            {toolDocs.map((doc: ProjectDocument) => (
+              <div
+                key={doc.id}
+                className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all ${
+                  doc.id === activeDocumentId
+                    ? 'bg-amber-50/80 border border-amber-200/60'
+                    : 'hover:bg-white/60 border border-transparent'
+                }`}
+                onClick={() => switchDocument(doc.id)}
+              >
+                <Wrench size={11} className={doc.id === activeDocumentId ? 'text-amber-500' : 'text-slate-400'} />
+                {renamingDocId === doc.id ? (
+                  <input
+                    ref={renameInputRef}
+                    className="flex-1 text-xs bg-transparent border-b border-accent-400 outline-none text-slate-900 min-w-0"
+                    maxLength={60}
+                    value={renameValue}
+                    onChange={e => setRenameValue(e.target.value)}
+                    onBlur={() => commitRename(doc.id)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') commitRename(doc.id);
+                      if (e.key === 'Escape') cancelRename();
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  />
+                ) : (
+                  <span className="flex-1 text-xs font-medium text-slate-700 truncate">{doc.name}</span>
+                )}
+                <span className="text-[10px] text-slate-400 font-mono flex-shrink-0">
+                  {doc.tree.length > 0 ? `${doc.tree.reduce((acc, n) => acc + 1 + n.children.length, 0)}` : '—'}
+                </span>
+                <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 flex-shrink-0 transition-opacity">
+                  <button
+                    onClick={e => { e.stopPropagation(); startRename(doc.id, doc.name); }}
+                    className="icon-btn-sm text-slate-400 hover:text-accent-600"
+                    title="Renommer"
+                  >
+                    <Pencil size={10} />
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); if (confirm(`Passer "${doc.name}" en document principal ?`)) setDocumentType(doc.id, 'main'); }}
+                    className="icon-btn-sm text-slate-400 hover:text-emerald-600"
+                    title="Définir comme document principal"
+                  >
+                    <ArrowRight size={10} />
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); if (confirm(`Supprimer "${doc.name}" ?`)) deleteDocument(doc.id); }}
+                    className="icon-btn-sm text-slate-400 hover:text-rose-600"
+                    title="Supprimer ce document"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() => createDocument('Nouveau document', 'tool')}
+              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-accent-600 hover:bg-white/60 transition-colors border border-dashed border-slate-200 mt-1"
+            >
+              <Plus size={11} />
+              <span>Ajouter un document outil</span>
+            </button>
           </div>
         )}
       </div>
