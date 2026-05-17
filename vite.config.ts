@@ -8,12 +8,16 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-192.svg', 'pwa-512.svg'],
+      workbox: {
+        // Some vendor chunks (mermaid, pdfjs) exceed the 2 MiB default
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
       manifest: {
-        name: 'Node IA Worker',
-        short_name: 'Node IA',
-        description: 'Collaboration IA local-first basée sur Markdown',
-        theme_color: '#4F46E5',
-        background_color: '#F9FAFB',
+        name: 'FractalIA · Markdown hiérarchique & IA contextuelle',
+        short_name: 'FractalIA',
+        description: 'Éditeur Markdown fractal local-first avec assistants IA (Gemini, OpenAI)',
+        theme_color: '#6366f1',
+        background_color: '#f4f5fb',
         display: 'standalone',
         start_url: '/',
         icons: [
@@ -42,7 +46,30 @@ export default defineConfig({
     open: true
   },
   build: {
-    target: 'es2022'
+    target: 'es2022',
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-resizable-panels'],
+          'clerk': ['@clerk/clerk-react'],
+          'mermaid': ['mermaid'],
+          'pdf': ['pdfjs-dist'],
+          'docx': ['mammoth', 'docx'],
+          'markdown': [
+            'react-markdown',
+            'remark-gfm',
+            'remark-parse',
+            'remark-stringify',
+            'rehype-sanitize',
+            'unified',
+            'mdast-util-find-and-replace',
+            'mdast-util-to-string',
+          ],
+          'zip': ['jszip'],
+        },
+      },
+    },
   },
   esbuild: {
     target: 'es2022'
