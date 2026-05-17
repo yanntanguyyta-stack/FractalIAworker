@@ -217,28 +217,27 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
   };
 
   return (
-    <div className={`bg-white border-r border-gray-200 flex flex-col h-full ${className} ${isTransitioning ? 'node-transition' : ''}`}>
-      {/* Breadcrumb - Fil d'Ariane */}
-      {/* Breadcrumb - uniquement si nœud spécifique sélectionné */}
+    <div className={`flex flex-col h-full ${className} ${isTransitioning ? 'node-transition' : ''}`}>
+      {/* Breadcrumb */}
       {!isDocRoot && nodePath.length > 0 && (
-        <div className="border-b border-gray-100 bg-gray-50 px-3 py-1.5 flex items-center gap-1 text-xs overflow-x-auto flex-shrink-0">
+        <div className="border-b border-white/40 px-3 py-1.5 flex items-center gap-0.5 text-[11px] overflow-x-auto flex-shrink-0">
           <button
             onClick={() => selectNode(DOCUMENT_ROOT_ID)}
-            className="hover:bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded transition-colors flex items-center gap-1"
+            className="px-2 py-1 rounded-md hover:bg-white/60 text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1.5"
             title="Document complet"
           >
-            <FileText size={12} className="text-gray-400 flex-shrink-0" />
+            <FileText size={11} className="text-slate-400 flex-shrink-0" />
             <span>Document</span>
           </button>
           {nodePath.map((node, index) => (
             <React.Fragment key={node.id}>
-              <ChevronRight size={12} className="text-gray-300 flex-shrink-0" />
+              <ChevronRight size={10} className="text-slate-300 flex-shrink-0" />
               <button
                 onClick={() => selectNode(node.id)}
-                className={`px-1.5 py-0.5 rounded transition-colors truncate max-w-[120px] ${
-                  index === nodePath.length - 1 
-                    ? 'bg-blue-100 text-blue-700 font-medium' 
-                    : 'hover:bg-gray-200 text-gray-600'
+                className={`px-2 py-1 rounded-md transition-colors truncate max-w-[140px] ${
+                  index === nodePath.length - 1
+                    ? 'bg-accent-100/80 text-accent-700 font-semibold'
+                    : 'hover:bg-white/60 text-slate-500 hover:text-slate-700'
                 }`}
                 title={node.heading}
               >
@@ -250,12 +249,14 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
       )}
 
       {/* Header avec métadonnées */}
-      <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50 p-3 flex-shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-bold text-gray-900 truncate flex-1">
+      <div className="border-b border-white/40 px-4 py-3 flex-shrink-0">
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <h3 className="text-xl font-bold text-slate-900 truncate flex-1 tracking-tight">
             {isDocRoot ? (
-              <span className="flex items-center gap-2">
-                <FileText size={20} className="text-indigo-600" />
+              <span className="flex items-center gap-2.5">
+                <span className="w-7 h-7 rounded-lg accent-gradient flex items-center justify-center shadow-glow-accent">
+                  <FileText size={14} className="text-white" />
+                </span>
                 Document complet
               </span>
             ) : (
@@ -264,36 +265,37 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
           </h3>
           <button
             onClick={handleCopy}
-            className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+            className="icon-btn tooltip-wrapper"
+            data-tooltip="Copier le contenu"
             title="Copier le contenu"
           >
-            {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-gray-600" />}
+            {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs flex-wrap">
           {isDocRoot ? (
-            <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">
-              H0 • Document racine • {tree.length} nœud(s) racine(s)
+            <span className="chip-accent">
+              H0 · {tree.length} racine{tree.length > 1 ? 's' : ''}
             </span>
           ) : activeNode && (
             <>
-              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                H{activeNode.headingDepth} • {activeNode.meta.type}
+              <span className="chip-accent">
+                H{activeNode.headingDepth} · {activeNode.meta.type}
               </span>
               {activeNode.meta.agentConfig?.role && (
-                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
-                  🤖 {activeNode.meta.agentConfig.role}
+                <span className="chip bg-fuchsia-100 text-fuchsia-700">
+                  ✦ {activeNode.meta.agentConfig.role}
                 </span>
               )}
               {activeNode.meta.contextConfig?.isGlobal && (
-                <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                  ✓ Global
+                <span className="chip bg-emerald-100 text-emerald-700">
+                  ● Global
                 </span>
               )}
               {activeNode.children.length > 0 && (
-                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">
-                  📁 {activeNode.children.length} enfant(s)
+                <span className="chip-neutral">
+                  {activeNode.children.length} enfant{activeNode.children.length > 1 ? 's' : ''}
                 </span>
               )}
             </>
@@ -301,94 +303,80 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
         </div>
       </div>
 
-      {/* Évaluation - uniquement si nœud spécifique */}
+      {/* Évaluation */}
       {assessmentConfig.enabled && activeNode && (
-        <div className="border-b border-gray-200 bg-white/80 backdrop-blur p-3 flex-shrink-0">
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-            <span className="font-semibold text-gray-700">Évaluation de complétude</span>
+        <div className="border-b border-white/40 px-4 py-3 flex-shrink-0">
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Évaluation de complétude</span>
             <button
               onClick={() => recalculateAllInheritedScores()}
-              className="flex items-center gap-1 px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded transition-colors"
+              className="btn-ghost text-xs py-1 px-2"
               title="Recalculer les notes héritées"
             >
-              <RefreshCw size={12} />
-              <span>Recalculer</span>
+              <RefreshCw size={11} />
+              Recalculer
             </button>
           </div>
-          <div className="text-xs text-gray-500 mb-3">
-            Question personnalisée : {assessmentConfig.question || 'Définissez une question globale dans les paramètres.'}
+          <div className="text-xs text-slate-500 mb-3 italic">
+            {assessmentConfig.question || 'Définissez une question globale dans les paramètres.'}
           </div>
-          
-          {/* Notes héritées des enfants */}
+
           {hasChildren && activeNode && (inheritedCompleteness !== undefined || inheritedQuestion !== undefined) && (
-            <div className="mb-3 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-              <div className="text-xs font-semibold text-blue-700 mb-2">📊 Notes héritées (moyenne des {activeNode.children.length} enfants)</div>
+            <div className="mb-3 p-3 accent-gradient-soft rounded-xl border border-accent-200/60">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-accent-600 mb-2">
+                Notes héritées · moyenne {activeNode.children.length} enfant{activeNode.children.length > 1 ? 's' : ''}
+              </div>
               <div className="flex gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-blue-600">Complétude:</span>
-                  <span className="font-bold text-blue-800">{inheritedCompleteness?.toFixed(1) ?? '-'}/10</span>
+                  <span className="text-xs text-slate-600">Complétude</span>
+                  <span className="font-bold text-accent-700 tabular-nums">{inheritedCompleteness?.toFixed(1) ?? '—'}<span className="text-slate-400 font-normal">/10</span></span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-blue-600">Question:</span>
-                  <span className="font-bold text-blue-800">{inheritedQuestion?.toFixed(1) ?? '-'}/10</span>
+                  <span className="text-xs text-slate-600">Question</span>
+                  <span className="font-bold text-accent-700 tabular-nums">{inheritedQuestion?.toFixed(1) ?? '—'}<span className="text-slate-400 font-normal">/10</span></span>
                 </div>
               </div>
             </div>
           )}
-          
+
           {hasChildren && activeNode && (
-            <div className="text-xs font-semibold text-gray-600 mb-1">📝 Notes propres (ce nœud)</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Notes propres</div>
           )}
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-600 w-40">Complétude du nœud</span>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                step={1}
-                value={completenessScore}
-                onChange={handleScoreChange('completenessScore')}
-                className="flex-1 accent-indigo-500"
-              />
-              <input
-                type="number"
-                min={0}
-                max={10}
-                value={completenessScore}
-                onChange={handleScoreChange('completenessScore')}
-                className="w-14 px-2 py-1 text-xs border border-gray-300 rounded-md"
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-600 w-40">Score question globale</span>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                step={1}
-                value={questionScore}
-                onChange={handleScoreChange('questionScore')}
-                className="flex-1 accent-indigo-500"
-              />
-              <input
-                type="number"
-                min={0}
-                max={10}
-                value={questionScore}
-                onChange={handleScoreChange('questionScore')}
-                className="w-14 px-2 py-1 text-xs border border-gray-300 rounded-md"
-              />
-            </div>
+          <div className="space-y-2.5">
+            {[
+              { label: 'Complétude du nœud', key: 'completenessScore' as const, value: completenessScore },
+              { label: 'Score question globale', key: 'questionScore' as const, value: questionScore },
+            ].map((row) => (
+              <div key={row.key} className="flex items-center gap-3">
+                <span className="text-xs text-slate-600 w-40 flex-shrink-0">{row.label}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={10}
+                  step={1}
+                  value={row.value}
+                  onChange={handleScoreChange(row.key)}
+                  className="flex-1 accent-accent-500"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={row.value}
+                  onChange={handleScoreChange(row.key)}
+                  className="input-sm w-14 text-center tabular-nums"
+                />
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {/* Toolbar */}
-      <div className="border-b border-gray-200 bg-gray-50 px-2 py-1.5 flex items-center gap-0.5 flex-wrap flex-shrink-0">
+      <div className="border-b border-white/40 px-2 py-1.5 flex items-center gap-0.5 flex-wrap flex-shrink-0">
         {activeNode && toolbarButtons.map((btn, idx) =>
           btn.divider ? (
-            <div key={idx} className="w-px h-6 bg-gray-300 mx-1.5" />
+            <div key={idx} className="w-px h-5 bg-slate-200 mx-1" />
           ) : (
             <button
               key={idx}
@@ -401,32 +389,32 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
             </button>
           )
         )}
-        
+
         {isDocRoot && (
-          <span className="text-xs text-gray-500 italic px-2">
-            Document complet — sélectionnez un nœud pour éditer son contenu
+          <span className="text-xs text-slate-500 italic px-2">
+            Sélectionnez un nœud pour éditer son contenu
           </span>
         )}
 
         <div className="flex-1" />
 
         {/* View Mode Toggle */}
-        <div className="flex items-center bg-gray-200 rounded-lg p-0.5">
+        <div className="flex items-center bg-white/50 border border-white/60 rounded-xl p-0.5 shadow-soft">
           {!isDocRoot && (
             <>
               <button
                 onClick={() => setViewMode('edit')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'edit' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+                className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ease-spring ${
+                  viewMode === 'edit' ? 'bg-white shadow-soft text-slate-900' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Edit3 size={14} />
+                <Edit3 size={12} />
                 Markdown
               </button>
               <button
                 onClick={() => setViewMode('split')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'split' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ease-spring ${
+                  viewMode === 'split' ? 'bg-white shadow-soft text-slate-900' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Split
@@ -435,12 +423,12 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
           )}
           <button
             onClick={() => setViewMode('preview')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'preview' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'
+            className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ease-spring ${
+              viewMode === 'preview' ? 'bg-white shadow-soft text-slate-900' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Eye size={14} />
-            Formatté
+            <Eye size={12} />
+            Formaté
           </button>
         </div>
       </div>
@@ -454,23 +442,17 @@ const EditorPane: React.FC<EditorPaneProps> = ({ className = '' }) => {
               ref={textareaRef}
               value={activeNode.content}
               onChange={(e) => updateNodeContent(activeNode.id, e.target.value)}
-              placeholder="Entrez le contenu du nœud...
-
-Utilisez la barre d'outils pour formater votre texte :
-- **Gras** avec **texte**
-- *Italique* avec *texte*
-- `Code` avec `code`
-- Tableaux et diagrammes Mermaid disponibles !"
-              className="w-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed overflow-y-auto flex-1 min-h-0"
+              placeholder="Entrez le contenu du nœud..."
+              className="w-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed overflow-y-auto flex-1 min-h-0 bg-transparent text-slate-800 placeholder:text-slate-400"
             />
             {/* Contenu des nœuds enfants — lecture seule */}
             {activeNode.children.length > 0 && (
-              <div className="flex-1 min-h-0 border-t-2 border-dashed border-indigo-200 overflow-y-auto p-4 bg-gray-50">
-                <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-3">
-                  ↳ Sections enfants
+              <div className="flex-1 min-h-0 border-t border-white/40 overflow-y-auto p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-accent-500 mb-3 flex items-center gap-1.5">
+                  <ChevronRight size={11} /> Sections enfants
                 </p>
                 <MarkdownPreview
-                  className="prose-sm text-gray-700"
+                  className="prose-sm text-slate-600"
                   content={activeNode.children
                     .map((child: NodeData) => getNodeFullContent(child.id))
                     .join('\n\n')}
@@ -480,53 +462,44 @@ Utilisez la barre d'outils pour formater votre texte :
           </div>
         )}
 
-        {/* Split mode: textarea (nœud actif) + preview (sous-arbre complet) */}
+        {/* Split mode */}
         {!isDocRoot && viewMode === 'split' && activeNode && (
           <>
-            <div className="w-1/2 border-r border-gray-200 flex flex-col overflow-hidden">
+            <div className="w-1/2 border-r border-white/40 flex flex-col overflow-hidden">
               <textarea
                 ref={textareaRef}
                 value={activeNode.content}
                 onChange={(e) => updateNodeContent(activeNode.id, e.target.value)}
                 placeholder="Entrez le contenu du nœud..."
-                className="w-full h-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed overflow-y-auto"
+                className="w-full h-full p-4 focus:outline-none resize-none font-mono text-sm leading-relaxed overflow-y-auto bg-transparent text-slate-800"
               />
             </div>
-            <div
-              ref={previewRef}
-              className="w-1/2 overflow-y-auto p-4 bg-white"
-            >
+            <div ref={previewRef} className="w-1/2 overflow-y-auto p-4">
               <MarkdownPreview className="prose-sm" content={previewContent} />
             </div>
           </>
         )}
 
-        {/* Mode Formatté : contenu complet du sous-arbre (nœud + enfants) en lecture seule */}
+        {/* Mode Formatté */}
         {viewMode === 'preview' && (
-          <div
-            ref={previewRef}
-            className="w-full overflow-y-auto p-4 bg-white"
-          >
+          <div ref={previewRef} className="w-full overflow-y-auto p-6">
             <MarkdownPreview className="prose-sm" content={previewContent} />
           </div>
         )}
 
-        {/* H0 en mode edit ou split : afficher le document complet en lecture seule */}
+        {/* H0 en mode edit ou split */}
         {isDocRoot && (viewMode === 'edit' || viewMode === 'split') && (
-          <div
-            ref={previewRef}
-            className="w-full overflow-y-auto p-4 bg-white"
-          >
+          <div ref={previewRef} className="w-full overflow-y-auto p-6">
             <MarkdownPreview className="prose-sm" content={previewContent} />
           </div>
         )}
       </div>
 
       {/* Statistiques */}
-      <div className="border-t border-gray-200 bg-gray-50 px-4 py-2 text-xs text-gray-600 flex justify-between">
-        <span>📝 {previewContent.length} caractères</span>
-        <span>📖 {previewContent.split(/\s+/).filter((w: string) => w).length} mots</span>
-        <span>📁 {isDocRoot ? tree.length + ' racine(s)' : (activeNode?.children.length || 0) + ' enfants'}</span>
+      <div className="flex-shrink-0 border-t border-white/40 px-4 py-2 text-[11px] text-slate-500 flex justify-between font-medium tabular-nums">
+        <span>{previewContent.length.toLocaleString()} caractères</span>
+        <span>{previewContent.split(/\s+/).filter((w: string) => w).length.toLocaleString()} mots</span>
+        <span>{isDocRoot ? `${tree.length} racine${tree.length > 1 ? 's' : ''}` : `${activeNode?.children.length || 0} enfant${(activeNode?.children.length || 0) > 1 ? 's' : ''}`}</span>
       </div>
     </div>
   );

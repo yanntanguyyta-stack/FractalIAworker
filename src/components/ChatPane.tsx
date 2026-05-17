@@ -87,9 +87,12 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
 
   if (!activeNode && !isDocRoot) {
     return (
-      <div className={`bg-gray-50 flex items-center justify-center ${className}`}>
-        <div className="text-center">
-          <p className="text-gray-500">Sélectionnez un nœud pour discuter</p>
+      <div className={`flex items-center justify-center h-full ${className}`}>
+        <div className="text-center px-6">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-2xl accent-gradient flex items-center justify-center shadow-glow-accent opacity-60">
+            <MessageSquare size={20} className="text-white" />
+          </div>
+          <p className="text-sm text-slate-500">Sélectionnez un nœud pour discuter</p>
         </div>
       </div>
     );
@@ -170,66 +173,67 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   };
 
   return (
-    <div className={`bg-white flex flex-col h-full ${className}`}>
+    <div className={`flex flex-col h-full ${className}`}>
       {/* Header */}
-      <div className="border-b border-gray-200 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50 p-3 flex-shrink-0">
-        <div className="flex items-center justify-between mb-2">
+      <div className="border-b border-white/40 px-4 py-3 flex-shrink-0">
+        <div className="flex items-center justify-between mb-2.5 gap-2">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-gray-900 truncate" title={activeNode?.heading || 'Document complet'}>
-              📄 {activeNode ? activeNode.heading : 'Document complet'}
+            <h3 className="text-base font-bold text-slate-900 truncate tracking-tight" title={activeNode?.heading || 'Document complet'}>
+              {activeNode ? activeNode.heading : 'Document complet'}
             </h3>
-            <p className="text-sm text-purple-600 font-medium truncate" title={activeNode?.meta.agentConfig?.role || 'Assistant IA'}>
-              🤖 <span className="italic">{activeNode?.meta.agentConfig?.role || 'Assistant IA (rôle par défaut)'}</span>
+            <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 mt-0.5" title={activeNode?.meta.agentConfig?.role || 'Assistant IA'}>
+              <span className="text-fuchsia-500">✦</span>
+              <span className="italic text-fuchsia-600 font-medium">{activeNode?.meta.agentConfig?.role || 'Assistant IA'}</span>
             </p>
           </div>
           <button
             onClick={onOpenSettings}
-            className="p-2 hover:bg-indigo-100 rounded-lg transition-colors flex-shrink-0 ml-2"
+            className="icon-btn tooltip-wrapper flex-shrink-0"
+            data-tooltip="Configurer l'IA"
             title="Configurer l'IA"
           >
-            <Settings size={18} className="text-indigo-600" />
+            <Settings size={15} />
           </button>
         </div>
 
         {/* Mode Toggle */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex bg-gray-100 rounded-lg p-0.5 flex-1">
-            <button
-              onClick={() => setChatMode('discussion')}
-              className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                aiConfig.chatMode === 'discussion' 
-                  ? 'bg-white shadow text-purple-700' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <MessageSquare size={14} />
-              Discussion
-            </button>
-            <button
-              onClick={() => setChatMode('structuration')}
-              className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                aiConfig.chatMode === 'structuration' 
-                  ? 'bg-white shadow text-orange-700' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <FileText size={14} />
-              Structuration
-            </button>
-          </div>
+        <div className="flex items-center bg-white/50 border border-white/60 rounded-xl p-0.5 shadow-soft mb-2">
+          <button
+            onClick={() => setChatMode('discussion')}
+            className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-spring ${
+              aiConfig.chatMode === 'discussion'
+                ? 'bg-white shadow-soft text-accent-700'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <MessageSquare size={12} />
+            Discussion
+          </button>
+          <button
+            onClick={() => setChatMode('structuration')}
+            className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-spring ${
+              aiConfig.chatMode === 'structuration'
+                ? 'bg-white shadow-soft text-orange-700'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <FileText size={12} />
+            Structuration
+          </button>
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          <div className={`relative flex items-center gap-1 px-2 py-0.5 rounded-full ${
-            aiConfig.provider === 'gemini' 
-              ? 'bg-blue-100 text-blue-700' 
-              : 'bg-green-100 text-green-700'
+          <div className={`relative flex items-center gap-1 pl-2 pr-1 py-1 rounded-lg border ${
+            aiConfig.provider === 'gemini'
+              ? 'bg-sky-50/70 border-sky-200/60 text-sky-700'
+              : 'bg-emerald-50/70 border-emerald-200/60 text-emerald-700'
           }`}>
-            <span>{aiConfig.provider === 'gemini' ? '🔮 ' : '🤖 '}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">{aiConfig.provider === 'gemini' ? 'Gemini' : 'OpenAI'}</span>
+            <span className="w-px h-3 bg-current opacity-30" />
             <select
               value={aiConfig.model}
               onChange={(e) => setAIConfig({ ...aiConfig, model: e.target.value })}
-              className="bg-transparent border-none outline-none text-xs font-medium appearance-none cursor-pointer pr-4"
+              className="bg-transparent border-none outline-none text-xs font-medium appearance-none cursor-pointer pr-4 pl-1"
               style={{ backgroundImage: 'none' }}
             >
               {aiConfig.provider === 'gemini' ? (
@@ -248,31 +252,31 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                 </>
               )}
             </select>
-            <ChevronDown size={10} className="absolute right-2 pointer-events-none" />
+            <ChevronDown size={10} className="absolute right-1.5 pointer-events-none opacity-60" />
           </div>
           {aiConfig.chatMode === 'structuration' && (
-            <>
-              <span className="text-gray-400">•</span>
-              <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                🏗️ Mode Structuration
-              </span>
-            </>
+            <span className="chip bg-orange-100 text-orange-700">
+              Mode Structuration
+            </span>
           )}
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
         {messages.length === 0 && (
-          <div className="text-center text-gray-500 py-8">
-            <p className="mb-2">Aucun message pour l'instant.</p>
-            <p className="text-xs mb-4">
-              {aiConfig.chatMode === 'structuration' 
-                ? 'Mode Structuration : l\'IA agit comme chef de projet et propose des sous-sections.'
-                : 'Mode Discussion : posez vos questions librement.'}
+          <div className="text-center py-12 px-4 animate-fade-in">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl accent-gradient-soft border border-accent-200/60 flex items-center justify-center">
+              <Zap size={18} className="text-accent-500" />
+            </div>
+            <p className="text-sm font-medium text-slate-700 mb-1">Aucun message pour l'instant</p>
+            <p className="text-xs text-slate-500 mb-4 max-w-xs mx-auto leading-relaxed">
+              {aiConfig.chatMode === 'structuration'
+                ? 'Mode Structuration · l\'IA agit comme chef de projet et propose des sous-sections.'
+                : 'Mode Discussion · posez vos questions librement.'}
             </p>
-            <p className="text-xs text-gray-400">
-              Utilisez les templates rapides ⚡ pour démarrer
+            <p className="text-[11px] text-slate-400">
+              Utilisez les templates rapides pour démarrer
             </p>
           </div>
         )}
@@ -280,13 +284,12 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex animate-fade-in-up ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             {msg.role === 'user' ? (
-              // Message utilisateur (inchangé)
-              <div className="max-w-[85%] p-3 rounded-lg bg-blue-500 text-white rounded-br-none">
-                <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                <p className="text-xs mt-1 opacity-70">
+              <div className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md accent-gradient text-white shadow-soft">
+                <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                <p className="text-[10px] mt-1 opacity-70 tabular-nums">
                   {msg.timestamp.toLocaleTimeString()}
                 </p>
               </div>
@@ -298,20 +301,20 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                   <>
                     {/* Section DISCUSSION */}
                     {msg.parsed.discussion && (
-                      <div className="bg-slate-100 rounded-lg overflow-hidden">
+                      <div className="bg-white/70 backdrop-blur-md border border-white/60 rounded-2xl overflow-hidden shadow-soft">
                         <button
                           onClick={() => toggleSection(idx, 'discussion')}
-                          className="w-full flex items-center gap-2 p-2 bg-slate-200 hover:bg-slate-300 transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/50 transition-colors"
                         >
-                          <ChevronRight 
-                            size={14} 
-                            className={`transition-transform ${isSectionExpanded(idx, 'discussion') ? 'rotate-90' : ''}`} 
+                          <ChevronRight
+                            size={13}
+                            className={`text-slate-400 transition-transform duration-200 ${isSectionExpanded(idx, 'discussion') ? 'rotate-90' : ''}`}
                           />
-                          <span className="text-sm font-medium text-slate-700">📣 Discussion</span>
+                          <span className="text-xs font-semibold text-slate-700 tracking-wide">Discussion</span>
                         </button>
                         {isSectionExpanded(idx, 'discussion') && (
-                          <div className="p-3">
-                            <p className="text-sm whitespace-pre-wrap break-words text-gray-700">{msg.parsed.discussion}</p>
+                          <div className="px-3 pb-3 pt-1 animate-fade-in">
+                            <p className="text-sm whitespace-pre-wrap break-words text-slate-700 leading-relaxed">{msg.parsed.discussion}</p>
                           </div>
                         )}
                       </div>
@@ -319,25 +322,25 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
 
                     {/* Section CONTENU */}
                     {msg.parsed.content && (
-                      <div className="bg-green-50 rounded-lg overflow-hidden border border-green-200">
+                      <div className="bg-emerald-50/50 backdrop-blur-md border border-emerald-200/50 rounded-2xl overflow-hidden shadow-soft">
                         <button
                           onClick={() => toggleSection(idx, 'content')}
-                          className="w-full flex items-center gap-2 p-2 bg-green-100 hover:bg-green-200 transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-emerald-50/80 transition-colors"
                         >
-                          <ChevronRight 
-                            size={14} 
-                            className={`transition-transform ${isSectionExpanded(idx, 'content') ? 'rotate-90' : ''}`} 
+                          <ChevronRight
+                            size={13}
+                            className={`text-emerald-500 transition-transform duration-200 ${isSectionExpanded(idx, 'content') ? 'rotate-90' : ''}`}
                           />
-                          <span className="text-sm font-medium text-green-700">📝 Contenu à intégrer</span>
+                          <span className="text-xs font-semibold text-emerald-700 tracking-wide">Contenu à intégrer</span>
                         </button>
                         {isSectionExpanded(idx, 'content') && (
-                          <div className="p-3">
-                            <p className="text-sm whitespace-pre-wrap break-words text-gray-800 mb-3">{msg.parsed.content}</p>
+                          <div className="px-3 pb-3 pt-1 animate-fade-in">
+                            <p className="text-sm whitespace-pre-wrap break-words text-slate-800 leading-relaxed mb-3">{msg.parsed.content}</p>
                             {activeNode && (
-                            <div className="flex gap-2">
+                            <div className="flex gap-1.5">
                               <button
                                 onClick={() => handleCommit(msg.parsed!.content, false)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded bg-green-500 hover:bg-green-600 text-white text-xs font-medium transition-colors"
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-all duration-150 active:scale-95 shadow-soft hover:shadow-soft-lg"
                               >
                                 <Plus size={12} />
                                 Ajouter au nœud
@@ -348,7 +351,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                                     handleCommit(msg.parsed!.content, true);
                                   }
                                 }}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors"
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-all duration-150 active:scale-95 shadow-soft hover:shadow-soft-lg"
                               >
                                 ↻ Remplacer
                               </button>
@@ -361,32 +364,32 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
 
                     {/* Section SOUS-SECTIONS */}
                     {msg.parsed.subsections.length > 0 && (
-                      <div className="bg-purple-50 rounded-lg overflow-hidden border border-purple-200">
+                      <div className="bg-fuchsia-50/50 backdrop-blur-md border border-fuchsia-200/50 rounded-2xl overflow-hidden shadow-soft">
                         <button
                           onClick={() => toggleSection(idx, 'subsections')}
-                          className="w-full flex items-center gap-2 p-2 bg-purple-100 hover:bg-purple-200 transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-fuchsia-50/80 transition-colors"
                         >
-                          <ChevronRight 
-                            size={14} 
-                            className={`transition-transform ${isSectionExpanded(idx, 'subsections') ? 'rotate-90' : ''}`} 
+                          <ChevronRight
+                            size={13}
+                            className={`text-fuchsia-500 transition-transform duration-200 ${isSectionExpanded(idx, 'subsections') ? 'rotate-90' : ''}`}
                           />
-                          <span className="text-sm font-medium text-purple-700">
-                            🏗️ Sous-sections proposées ({msg.parsed.subsections.length})
+                          <span className="text-xs font-semibold text-fuchsia-700 tracking-wide">
+                            Sous-sections proposées · {msg.parsed.subsections.length}
                           </span>
                         </button>
                         {isSectionExpanded(idx, 'subsections') && (
-                          <div className="p-3 space-y-2">
+                          <div className="px-3 pb-3 pt-1 space-y-1.5 animate-fade-in">
                             {msg.parsed.subsections.map((sub, subIdx) => (
-                              <div key={subIdx} className="flex items-start gap-2 p-2 bg-white rounded border border-purple-100">
+                              <div key={subIdx} className="flex items-start gap-2 p-2 bg-white/70 rounded-xl border border-fuchsia-100/60">
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] font-bold text-fuchsia-600 bg-fuchsia-100 px-1.5 py-0.5 rounded tracking-wider">
                                       H{sub.level}
                                     </span>
-                                    <span className="font-medium text-sm text-gray-800 truncate">{sub.title}</span>
+                                    <span className="font-semibold text-sm text-slate-800 truncate">{sub.title}</span>
                                   </div>
                                   {sub.description && (
-                                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">{sub.description}</p>
+                                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">{sub.description}</p>
                                   )}
                                 </div>
                                 <button
@@ -394,10 +397,10 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                                     const targetId = activeNode ? activeNode.id : DOCUMENT_ROOT_ID;
                                     addChild(targetId, sub.title);
                                   }}
-                                  className="flex items-center gap-1 px-2 py-1 rounded bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors whitespace-nowrap"
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-fuchsia-500 hover:bg-fuchsia-600 text-white text-[11px] font-semibold transition-all active:scale-95 whitespace-nowrap shadow-soft"
                                   title="Créer ce nœud enfant"
                                 >
-                                  <Plus size={12} />
+                                  <Plus size={11} />
                                   Créer
                                 </button>
                               </div>
@@ -411,9 +414,9 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                                   });
                                 }
                               }}
-                              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-semibold transition-all active:scale-95 shadow-soft hover:shadow-glow-accent"
                             >
-                              <Plus size={14} />
+                              <Plus size={13} />
                               Créer toutes les sous-sections
                             </button>
                           </div>
@@ -422,20 +425,21 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                     )}
                   </>
                 ) : (
-                  // Fallback: affichage classique si pas de parsing
-                  <div className="bg-gray-100 text-gray-900 rounded-lg rounded-bl-none p-3">
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                    <div className="flex flex-wrap gap-2 mt-3">
+                  // Fallback: affichage classique
+                  <div className="bg-white/70 backdrop-blur-md border border-white/60 text-slate-800 rounded-2xl rounded-bl-md px-4 py-3 shadow-soft">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Réponse IA</div>
+                    <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
                       <button
                         onClick={() => handleCopy(idx, msg.content)}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-white/50 hover:bg-white text-xs text-gray-700 transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/80 hover:bg-white text-xs text-slate-700 transition-colors"
                       >
-                        {copiedId === idx ? <><Check size={12} /> Copié</> : <><Copy size={12} /> Copier</>}
+                        {copiedId === idx ? <><Check size={11} /> Copié</> : <><Copy size={11} /> Copier</>}
                       </button>
                       {activeNode && (
                       <button
                         onClick={() => handleCommit(msg.content, false)}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-xs transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs transition-colors"
                       >
                         + Ajouter
                       </button>
@@ -445,13 +449,13 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                 )}
 
                 {/* Timestamp et actions globales */}
-                <div className="flex items-center justify-between px-1">
-                  <p className="text-xs text-gray-400">
+                <div className="flex items-center justify-between px-2">
+                  <p className="text-[10px] text-slate-400 tabular-nums">
                     {msg.timestamp.toLocaleTimeString()}
                   </p>
                   <button
                     onClick={() => handleCopy(idx, msg.content)}
-                    className="text-xs text-gray-500 hover:text-gray-700"
+                    className="text-[10px] text-slate-500 hover:text-slate-800 transition-colors font-medium"
                   >
                     {copiedId === idx ? '✓ Copié' : 'Copier tout'}
                   </button>
@@ -462,9 +466,16 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
         ))}
 
         {loading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-600 p-3 rounded-lg rounded-bl-none">
-              <p className="text-sm">L'IA réfléchit...</p>
+          <div className="flex justify-start animate-fade-in">
+            <div className="bg-white/70 backdrop-blur-md border border-white/60 text-slate-600 px-4 py-3 rounded-2xl rounded-bl-md shadow-soft">
+              <p className="text-sm flex items-center gap-2">
+                <span className="inline-flex gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </span>
+                L'IA réfléchit...
+              </p>
             </div>
           </div>
         )}
@@ -472,98 +483,70 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Templates rapides - organisés par catégorie */}
+      {/* Templates rapides */}
       {showTemplates && (
-        <div className="border-t border-gray-200 bg-white p-3 flex-shrink-0 max-h-64 overflow-y-auto">
-          {/* Structuration */}
-          <div className="mb-3">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">🏗️ Structuration</h4>
-            <div className="grid grid-cols-2 gap-1.5">
-              {promptTemplates.filter(t => t.category === 'structuration').map((template) => (
-                <button
-                  key={template.label}
-                  onClick={() => handleUseTemplate(template.prompt)}
-                  className="flex items-center gap-2 p-2 text-left text-xs bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border border-transparent rounded-lg transition-colors"
-                >
-                  <span>{template.icon}</span>
-                  <span className="font-medium truncate">{template.label}</span>
-                </button>
-              ))}
+        <div className="border-t border-white/40 px-3 py-3 flex-shrink-0 max-h-64 overflow-y-auto animate-fade-in-up">
+          {([
+            { key: 'structuration', label: '🏗️ Structuration', accent: 'text-accent-600', hoverBg: 'hover:bg-accent-50' },
+            { key: 'tableau', label: '📊 Tableaux', accent: 'text-emerald-600', hoverBg: 'hover:bg-emerald-50' },
+            { key: 'mermaid', label: '📐 Diagrammes Mermaid', accent: 'text-fuchsia-600', hoverBg: 'hover:bg-fuchsia-50' },
+          ] as const).map((cat, ci) => (
+            <div key={cat.key} className={ci > 0 ? 'mt-3' : ''}>
+              <h4 className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${cat.accent}`}>{cat.label}</h4>
+              <div className="grid grid-cols-2 gap-1">
+                {promptTemplates.filter(t => t.category === cat.key).map((template) => (
+                  <button
+                    key={template.label}
+                    onClick={() => handleUseTemplate(template.prompt)}
+                    className={`flex items-center gap-1.5 p-1.5 text-left text-xs bg-white/60 ${cat.hoverBg} border border-white/60 rounded-lg transition-all duration-150 active:scale-95`}
+                  >
+                    <span className="text-sm">{template.icon}</span>
+                    <span className="font-medium truncate text-slate-700">{template.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          
-          {/* Tableaux */}
-          <div className="mb-3">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📊 Tableaux</h4>
-            <div className="grid grid-cols-2 gap-1.5">
-              {promptTemplates.filter(t => t.category === 'tableau').map((template) => (
-                <button
-                  key={template.label}
-                  onClick={() => handleUseTemplate(template.prompt)}
-                  className="flex items-center gap-2 p-2 text-left text-xs bg-green-50 hover:bg-green-100 hover:border-green-200 border border-transparent rounded-lg transition-colors"
-                >
-                  <span>{template.icon}</span>
-                  <span className="font-medium truncate">{template.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Diagrammes Mermaid */}
-          <div>
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📐 Diagrammes Mermaid</h4>
-            <div className="grid grid-cols-2 gap-1.5">
-              {promptTemplates.filter(t => t.category === 'mermaid').map((template) => (
-                <button
-                  key={template.label}
-                  onClick={() => handleUseTemplate(template.prompt)}
-                  className="flex items-center gap-2 p-2 text-left text-xs bg-purple-50 hover:bg-purple-100 hover:border-purple-200 border border-transparent rounded-lg transition-colors"
-                >
-                  <span>{template.icon}</span>
-                  <span className="font-medium truncate">{template.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
       {/* Input */}
       <form
         onSubmit={handleSendMessage}
-        className="border-t border-gray-200 p-3 bg-gray-50 flex-shrink-0"
+        className="border-t border-white/40 p-3 flex-shrink-0"
       >
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-1.5">
           <button
             type="button"
             onClick={() => setShowTemplates(!showTemplates)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors ${
-              showTemplates 
-                ? 'bg-purple-100 text-purple-700' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            className={`px-2.5 py-2 rounded-xl text-sm font-medium flex items-center gap-0.5 transition-all duration-150 active:scale-95 ${
+              showTemplates
+                ? 'bg-accent-100 text-accent-700'
+                : 'bg-white/60 text-slate-600 hover:bg-white/90 border border-white/60'
             }`}
             title="Templates rapides"
           >
             <Zap size={14} />
-            <ChevronDown size={14} className={`transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
+            <ChevronDown size={12} className={`transition-transform duration-200 ${showTemplates ? 'rotate-180' : ''}`} />
           </button>
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={aiConfig.chatMode === 'structuration' 
-              ? "Demandez une analyse ou structuration..." 
+            placeholder={aiConfig.chatMode === 'structuration'
+              ? "Demandez une analyse ou structuration..."
               : "Posez une question..."
             }
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+            className="input flex-1"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white rounded-lg font-medium flex items-center gap-2 transition-colors text-sm"
+            className="btn-primary px-3"
+            title="Envoyer"
           >
-            <Send size={16} />
+            <Send size={14} />
           </button>
         </div>
       </form>

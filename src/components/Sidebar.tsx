@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste,
-  GripVertical, Search, Undo2, Redo2, FileText, Pencil,
+  GripVertical, Search, Undo2, Redo2, FileText, Pencil, X,
   ChevronUp as LevelUp, ChevronDown as LevelDown, Sparkles,
 } from 'lucide-react';
 import { useStore, DOCUMENT_ROOT_ID } from '../store';
@@ -19,22 +19,32 @@ interface SidebarProps {
   className?: string;
 }
 
-const depthColors = [
-  'border-blue-500',
+// Accent-tinted depth palette (used on the active border + H{n} chip)
+const depthBorder = [
+  'border-sky-500',
   'border-indigo-500',
-  'border-purple-500',
-  'border-pink-500',
+  'border-violet-500',
+  'border-fuchsia-500',
   'border-rose-500',
-  'border-orange-500',
+  'border-amber-500',
 ];
 
-const depthBgColors = [
-  'bg-blue-50',
-  'bg-indigo-50',
-  'bg-purple-50',
-  'bg-pink-50',
-  'bg-rose-50',
-  'bg-orange-50',
+const depthChipBg = [
+  'bg-sky-100 text-sky-700',
+  'bg-indigo-100 text-indigo-700',
+  'bg-violet-100 text-violet-700',
+  'bg-fuchsia-100 text-fuchsia-700',
+  'bg-rose-100 text-rose-700',
+  'bg-amber-100 text-amber-700',
+];
+
+const depthActiveBg = [
+  'bg-sky-50/70',
+  'bg-indigo-50/70',
+  'bg-violet-50/70',
+  'bg-fuchsia-50/70',
+  'bg-rose-50/70',
+  'bg-amber-50/70',
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
@@ -117,7 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     const isExpanded = effectiveExpanded.has(node.id);
     const hasChildren = node.children.length > 0;
     const isActive = activeNodeId === node.id;
-    const colorIndex = Math.min(depth, depthColors.length - 1);
+    const colorIndex = Math.min(depth, depthBorder.length - 1);
     const dragHandlers = getNodeHandlers(node.id);
     const incomplete = isNodeIncomplete(node);
 
@@ -126,16 +136,16 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         <div className="relative">
           {depth > 0 && (
             <div
-              className="absolute left-0 top-0 bottom-0 w-px bg-gray-200"
-              style={{ left: `${(depth - 1) * 16 + 10}px` }}
+              className="absolute top-0 bottom-0 w-px bg-slate-200/60"
+              style={{ left: `${(depth - 1) * 16 + 14}px` }}
             />
           )}
           <div
-            className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer rounded-md transition-all duration-150 ${
+            className={`group flex items-center gap-1.5 pl-2 pr-2 py-1.5 cursor-pointer rounded-xl transition-all duration-200 ease-spring border-l-2 ${
               isActive
-                ? `${depthBgColors[colorIndex]} border-l-4 ${depthColors[colorIndex]} shadow-sm`
-                : 'hover:bg-gray-100 border-l-4 border-transparent'
-            } ${dragHandlers.isDropTarget ? 'ring-2 ring-blue-400' : ''}`}
+                ? `${depthActiveBg[colorIndex]} ${depthBorder[colorIndex]} shadow-soft`
+                : 'border-transparent hover:bg-white/60'
+            } ${dragHandlers.isDropTarget ? 'ring-2 ring-accent-400/60' : ''}`}
             style={{ marginLeft: `${depth * 16}px` }}
             onClick={() => selectNode(node.id)}
             draggable={dragHandlers.draggable}
@@ -145,28 +155,28 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             onDragLeave={dragHandlers.onDragLeave}
             onDrop={dragHandlers.onDrop}
           >
-            <GripVertical size={12} className="text-gray-400 flex-shrink-0" />
+            <GripVertical size={11} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
             {hasChildren ? (
               <button
                 onClick={(e) => { e.stopPropagation(); toggleExpanded(node.id); }}
-                className="p-0.5 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+                className="p-0.5 hover:bg-white/80 rounded-md transition-colors flex-shrink-0"
                 aria-label={isExpanded ? 'Replier' : 'Déplier'}
               >
                 {isExpanded ? (
-                  <ChevronDown size={14} className="text-gray-500" />
+                  <ChevronDown size={13} className="text-slate-500" />
                 ) : (
-                  <ChevronRight size={14} className="text-gray-500" />
+                  <ChevronRight size={13} className="text-slate-500" />
                 )}
               </button>
             ) : (
               <div className="w-4 flex-shrink-0" />
             )}
 
-            <span className={`text-[10px] font-bold px-1 rounded ${depthBgColors[colorIndex]} ${depthColors[colorIndex].replace('border-', 'text-')}`}>
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${depthChipBg[colorIndex]} flex-shrink-0 tracking-wider`}>
               H{node.headingDepth}
             </span>
 
-            <span className="flex-1 truncate text-sm font-medium">
+            <span className={`flex-1 truncate text-sm leading-tight ${isActive ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
               {matchIds.has(node.id) ? highlightMatch(node.heading || '(Sans titre)', trimmedSearch) : node.heading || '(Sans titre)'}
             </span>
 
@@ -180,14 +190,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
             )}
 
             {node.meta.contextConfig?.isGlobal && (
-              <span className="text-green-500 text-[10px] flex-shrink-0" title="Contexte global">🌐</span>
+              <span className="text-emerald-500 text-[10px] flex-shrink-0" title="Contexte global">●</span>
             )}
             {node.meta.agentConfig?.role && (
-              <span className="text-purple-500 text-[10px] flex-shrink-0" title={`Agent: ${node.meta.agentConfig.role}`}>🤖</span>
+              <span className="text-fuchsia-500 text-[10px] flex-shrink-0" title={`Agent: ${node.meta.agentConfig.role}`}>✦</span>
             )}
             {hasChildren && (
-              <span className="text-[10px] text-gray-400 flex-shrink-0" title={`${node.children.length} enfant(s)`}>
-                ({node.children.length})
+              <span className="text-[10px] text-slate-400 flex-shrink-0 font-mono" title={`${node.children.length} enfant(s)`}>
+                {node.children.length}
               </span>
             )}
           </div>
@@ -195,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
         {isActive && (
           <div
-            className="flex items-center gap-1 px-2 py-1 mx-1 mb-1 bg-slate-100 rounded-md border border-slate-200 flex-wrap"
+            className="flex items-center gap-0.5 px-1.5 py-1 mx-1 mb-1 mt-1 bg-white/70 backdrop-blur-md rounded-xl border border-white/80 shadow-soft flex-wrap animate-fade-in-down"
             style={{ marginLeft: `${depth * 16 + 8}px` }}
           >
             {node.headingDepth < 6 && (
@@ -206,10 +216,10 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   const title = prompt(`Créer un sous-nœud (H${childLevel}) sous "${node.heading}":\n\nTitre du nouveau nœud :`);
                   if (title && title.trim()) addChild(node.id, title.trim());
                 }}
-                className="p-1.5 hover:bg-green-200 rounded text-green-700 tooltip-wrapper"
+                className="icon-btn-sm tooltip-wrapper text-emerald-600 hover:bg-emerald-50"
                 data-tooltip={`Ajouter H${node.headingDepth + 1}`}
               >
-                <Plus size={14} />
+                <Plus size={13} />
               </button>
             )}
 
@@ -221,40 +231,40 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   updateNodeHeading(node.id, newName.trim());
                 }
               }}
-              className="p-1.5 hover:bg-cyan-200 rounded text-cyan-700 tooltip-wrapper"
+              className="icon-btn-sm tooltip-wrapper text-sky-600 hover:bg-sky-50"
               data-tooltip="Renommer"
             >
-              <Pencil size={14} />
+              <Pencil size={13} />
             </button>
 
             <button
               onClick={(e) => { e.stopPropagation(); copyNode(node.id); }}
-              className="p-1.5 hover:bg-blue-200 rounded text-blue-700 tooltip-wrapper"
+              className="icon-btn-sm tooltip-wrapper text-accent-600 hover:bg-accent-50"
               data-tooltip="Copier"
             >
-              <Copy size={14} />
+              <Copy size={13} />
             </button>
 
             {clipboardNode && (
               <button
                 onClick={(e) => { e.stopPropagation(); handlePasteNode(node.id); }}
-                className="p-1.5 hover:bg-indigo-200 rounded text-indigo-700 tooltip-wrapper"
+                className="icon-btn-sm tooltip-wrapper text-indigo-600 hover:bg-indigo-50"
                 data-tooltip="Coller comme enfant"
               >
-                <ClipboardPaste size={14} />
+                <ClipboardPaste size={13} />
               </button>
             )}
 
-            <span className="w-px h-5 bg-slate-300 mx-0.5" />
+            <span className="w-px h-4 bg-slate-200 mx-0.5" />
 
             {node.headingDepth > 1 && (
               <button
                 onClick={(e) => { e.stopPropagation(); promoteNode(node.id, true); }}
-                className="p-1.5 hover:bg-amber-200 rounded tooltip-wrapper flex items-center gap-0.5"
+                className="icon-btn-sm tooltip-wrapper text-amber-600 hover:bg-amber-50 px-1.5 gap-0.5 w-auto"
                 data-tooltip={`Promouvoir en H${node.headingDepth - 1}`}
               >
-                <LevelUp size={14} className="text-amber-700" />
-                <span className="text-[9px] font-bold text-amber-700">H{node.headingDepth - 1}</span>
+                <LevelUp size={13} />
+                <span className="text-[9px] font-bold">H{node.headingDepth - 1}</span>
               </button>
             )}
 
@@ -267,15 +277,15 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                     alert('Impossible : pas de nœud frère précédent ou profondeur max atteinte.');
                   }
                 }}
-                className="p-1.5 hover:bg-orange-200 rounded tooltip-wrapper flex items-center gap-0.5"
+                className="icon-btn-sm tooltip-wrapper text-orange-600 hover:bg-orange-50 px-1.5 gap-0.5 w-auto"
                 data-tooltip={`Rétrograder en H${node.headingDepth + 1}`}
               >
-                <LevelDown size={14} className="text-orange-700" />
-                <span className="text-[9px] font-bold text-orange-700">H{node.headingDepth + 1}</span>
+                <LevelDown size={13} />
+                <span className="text-[9px] font-bold">H{node.headingDepth + 1}</span>
               </button>
             )}
 
-            <span className="w-px h-5 bg-slate-300 mx-0.5" />
+            <span className="w-px h-4 bg-slate-200 mx-0.5" />
 
             <button
               onClick={(e) => {
@@ -284,15 +294,15 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   deleteNode(node.id);
                 }
               }}
-              className="p-1.5 hover:bg-red-200 rounded text-red-600 tooltip-wrapper"
+              className="icon-btn-sm tooltip-wrapper text-rose-600 hover:bg-rose-50"
               data-tooltip="Supprimer"
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
             </button>
 
             {incomplete && (
               <>
-                <span className="w-px h-5 bg-slate-300 mx-0.5" />
+                <span className="w-px h-4 bg-slate-200 mx-0.5" />
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -300,10 +310,10 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                       `Ce nœud intitulé "${node.heading}" semble incomplet ou vide. Propose un enrichissement pertinent : développe le contenu, ajoute des détails, des exemples ou des sous-sections adaptées au contexte.`
                     );
                   }}
-                  className="p-1.5 hover:bg-amber-200 rounded text-amber-700 tooltip-wrapper flex items-center gap-0.5"
-                  data-tooltip="Proposer un enrichissement IA"
+                  className="icon-btn-sm tooltip-wrapper text-amber-600 hover:bg-amber-50"
+                  data-tooltip="Enrichissement IA"
                 >
-                  <Sparkles size={14} />
+                  <Sparkles size={13} />
                 </button>
               </>
             )}
@@ -348,127 +358,140 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const historyCanRedo = canRedo();
 
   return (
-    <div className={`bg-white flex flex-col h-full ${className}`}>
-      <div className="p-3 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-slate-50 via-indigo-50 to-purple-50">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-            <FolderTree size={18} className="text-blue-600" />
+    <div className={`flex flex-col h-full ${className}`}>
+      <div className="px-3 pt-3 pb-2 flex-shrink-0 border-b border-white/40">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <FolderTree size={13} className="text-accent-500" />
             Structure
           </h2>
-          <div className="flex gap-1">
+          <div className="flex gap-0.5 items-center">
             <button
               onClick={undo}
               disabled={!historyCanUndo}
-              className={`text-xs px-2 py-1 rounded transition-colors ${historyCanUndo ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
-              title="Annuler (Ctrl+Z)"
+              className="icon-btn-sm tooltip-wrapper disabled:opacity-30"
+              data-tooltip="Annuler (Ctrl+Z)"
+              title="Annuler"
             >
-              <Undo2 size={14} />
+              <Undo2 size={13} />
             </button>
             <button
               onClick={redo}
               disabled={!historyCanRedo}
-              className={`text-xs px-2 py-1 rounded transition-colors ${historyCanRedo ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
-              title="Rétablir (Ctrl+Y)"
+              className="icon-btn-sm tooltip-wrapper disabled:opacity-30"
+              data-tooltip="Rétablir (Ctrl+Y)"
+              title="Rétablir"
             >
-              <Redo2 size={14} />
+              <Redo2 size={13} />
             </button>
-            <span className="w-px bg-gray-300 mx-1"></span>
+            <span className="w-px h-4 bg-slate-200 mx-0.5" />
             <button
               onClick={handleAddRootNode}
-              className="text-xs px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors font-medium"
-              title="Ajouter un nœud racine (H1)"
+              className="icon-btn-sm tooltip-wrapper text-emerald-600 hover:bg-emerald-50 px-1.5 gap-0.5 w-auto"
+              data-tooltip="Nouveau nœud racine (H1)"
+              title="Nouveau H1"
             >
-              + H1
+              <span className="text-[10px] font-bold leading-none">+H1</span>
             </button>
             <button
               onClick={expandAll}
-              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+              className="icon-btn-sm tooltip-wrapper"
+              data-tooltip="Tout déplier"
               title="Tout déplier"
             >
-              ⊞
+              <ChevronDown size={13} />
             </button>
             <button
               onClick={collapseAll}
-              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+              className="icon-btn-sm tooltip-wrapper"
+              data-tooltip="Tout replier"
               title="Tout replier"
             >
-              ⊟
+              <ChevronRight size={13} />
             </button>
             {clipboardNode && (
               <button
                 onClick={() => handlePasteNode(null)}
-                className="text-xs px-2 py-1 bg-indigo-100 hover:bg-indigo-200 rounded transition-colors"
+                className="icon-btn-sm tooltip-wrapper text-accent-600 hover:bg-accent-50"
+                data-tooltip="Coller à la racine"
                 title="Coller à la racine"
               >
-                ↧
+                <ClipboardPaste size={13} />
               </button>
             )}
           </div>
         </div>
-        <p className="text-xs text-gray-500">
-          {totalNodes} nœuds • {maxDepth} niveaux
+        <p className="text-[10px] text-slate-400 font-medium mb-2">
+          {totalNodes} nœud{totalNodes > 1 ? 's' : ''} · {maxDepth} niveau{maxDepth > 1 ? 'x' : ''}
         </p>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <div className="relative flex-1">
-            <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Rechercher un nœud..."
-              className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              placeholder="Rechercher…"
+              className="input-sm pl-7"
             />
           </div>
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-              title="Effacer la recherche"
+              className="icon-btn-sm"
+              title="Effacer"
             >
-              ✕
+              <X size={12} />
             </button>
           )}
         </div>
         {clipboardNode && (
-          <p className="mt-2 text-[10px] text-gray-500">
-            📋 Copié : <span className="font-medium">{clipboardNode.heading || 'Sans titre'}</span>
-          </p>
+          <div className="mt-2 px-2 py-1 rounded-lg bg-accent-50/70 text-[10px] text-accent-700 flex items-center gap-1.5">
+            <Copy size={10} />
+            <span className="truncate font-medium">{clipboardNode.heading || 'Sans titre'}</span>
+          </div>
         )}
       </div>
 
       <div
-        className="flex-1 overflow-y-auto min-h-0"
+        className="flex-1 overflow-y-auto min-h-0 px-2 pb-2"
         onDragOver={rootHandlers.onDragOver}
         onDrop={rootHandlers.onDrop}
       >
-        <div className="p-2 border-b border-gray-200">
+        <div className="pt-2 pb-1">
           <div
-            className={`flex items-center gap-2 px-3 py-2 cursor-pointer rounded-lg transition-all duration-150 ${
+            className={`flex items-center gap-2 px-2.5 py-2 cursor-pointer rounded-xl transition-all duration-200 ease-spring border-l-2 ${
               isDocumentRoot
-                ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-l-4 border-indigo-500 shadow-sm'
-                : 'hover:bg-gray-100 border-l-4 border-transparent'
+                ? 'accent-gradient-soft border-accent-500 shadow-soft'
+                : 'border-transparent hover:bg-white/60'
             }`}
             onClick={() => selectDocumentRoot()}
           >
-            <FileText size={16} className={isDocumentRoot ? 'text-indigo-600' : 'text-gray-500'} />
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isDocumentRoot ? 'bg-indigo-200 text-indigo-700' : 'bg-gray-200 text-gray-600'}`}>
+            <FileText size={14} className={isDocumentRoot ? 'text-accent-600' : 'text-slate-500'} />
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wider ${isDocumentRoot ? 'bg-accent-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
               H0
             </span>
-            <span className={`flex-1 text-sm font-semibold ${isDocumentRoot ? 'text-indigo-900' : 'text-gray-700'}`}>
+            <span className={`flex-1 text-sm leading-tight ${isDocumentRoot ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
               Document complet
             </span>
-            <span className="text-[10px] text-gray-400">
-              ({tree.length} racine{tree.length > 1 ? 's' : ''})
+            <span className="text-[10px] text-slate-400 font-mono">
+              {tree.length} racine{tree.length > 1 ? 's' : ''}
             </span>
           </div>
         </div>
 
+        <div className="divider my-1" />
+
         {visibleTree.length === 0 ? (
-          <div className="p-4 text-sm text-gray-500">
-            {searchTerm ? 'Aucun résultat pour cette recherche.' : 'Aucun nœud. Chargez un Markdown pour commencer.'}
+          <div className="px-4 py-8 text-center text-xs text-slate-400">
+            {searchTerm ? (
+              <span>Aucun résultat pour <span className="font-mono">"{searchTerm}"</span></span>
+            ) : (
+              <span>Aucun nœud. Importez un Markdown pour commencer.</span>
+            )}
           </div>
         ) : (
-          <div className="p-2">
+          <div className="pt-1">
             {visibleTree.map(node => renderNode(node))}
           </div>
         )}
