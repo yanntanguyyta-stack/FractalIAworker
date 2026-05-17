@@ -1,5 +1,5 @@
 import React from 'react';
-import { Send, Copy, Check, Settings, MessageSquare, FileText, Zap, ChevronDown, Plus, ChevronRight } from 'lucide-react';
+import { Send, Copy, Check, Settings, MessageSquare, FileText, Zap, ChevronDown, Plus, ChevronRight, X as XIcon } from 'lucide-react';
 import { useStore, ChatMode, DOCUMENT_ROOT_ID } from '../store';
 import { buildContextSandwich, buildSystemPrompt, buildUserMessage, callAIAPI, parseAIResponse, ParsedAIResponse, SubsectionProposal } from '../aiService';
 import { extractHeadingSections } from '../utils/markdownSections';
@@ -48,7 +48,8 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   const [copiedId, setCopiedId] = React.useState<number | null>(null);
   const [showTemplates, setShowTemplates] = React.useState(false);
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(['discussion', 'content', 'subsections']));
-  const [showContextDocs, setShowContextDocs] = React.useState(false);
+  const [showDocPicker, setShowDocPicker] = React.useState(false);
+  const docPickerRef = React.useRef<HTMLDivElement>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const activeDoc = documents.find(d => d.id === activeDocumentId);
@@ -63,6 +64,18 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
     if (next.has(id)) next.delete(id); else next.add(id);
     setDocumentContextIds(activeDocumentId, Array.from(next));
   };
+
+  // Close doc picker on outside click
+  React.useEffect(() => {
+    if (!showDocPicker) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (docPickerRef.current && !docPickerRef.current.contains(e.target as Node)) {
+        setShowDocPicker(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [showDocPicker]);
 
   // Consume pending AI prompt from sidebar enrichment action
   React.useEffect(() => {
@@ -242,43 +255,58 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
           </button>
         </div>
 
-        {/* Documents de contexte additionnels */}
+        {/* Documents de contexte — chips persistants */}
         {otherDocuments.length > 0 && (
-          <div className="mb-2">
-            <button
-              onClick={() => setShowContextDocs(v => !v)}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                contextDocIds.size > 0
-                  ? 'bg-violet-100/70 text-violet-700 font-semibold'
-                  : 'bg-white/40 text-slate-500 hover:bg-white/60'
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <FileText size={11} />
-                {contextDocIds.size > 0
-                  ? `${contextDocIds.size} doc${contextDocIds.size > 1 ? 's' : ''} en contexte`
-                  : 'Contexte documents additionnels'}
-              </span>
-              <ChevronRight size={11} className={`transition-transform ${showContextDocs ? 'rotate-90' : ''}`} />
-            </button>
-            {showContextDocs && (
-              <div className="mt-1 px-1 space-y-0.5 animate-fade-in">
-                {otherDocuments.map(doc => (
-                  <label
-                    key={doc.id}
-                    className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/50 cursor-pointer transition-colors"
+          <div className="mb-2 flex flex-wrap items-center gap-1 min-h-[24px]">
+            {Array.from(contextDocIds).map(id => {
+              const doc = otherDocuments.find(d => d.id === id);
+              if (!doc) return null;
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-violet-100 border border-violet-200/70 text-violet-700 text-[11px] font-medium"
+                >
+                  <FileText size={10} className="flex-shrink-0" />
+                  <span className="truncate max-w-[100px]">{doc.name}</span>
+                  <button
+                    onClick={() => toggleContextDoc(id)}
+                    className="ml-0.5 hover:bg-violet-200 rounded-full p-0.5 transition-colors"
+                    title={`Retirer ${doc.name} du contexte`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={contextDocIds.has(doc.id)}
-                      onChange={() => toggleContextDoc(doc.id)}
-                      className="accent-violet-500"
-                    />
-                    <span className="text-xs text-slate-700 truncate">{doc.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+                    <XIcon size={9} />
+                  </button>
+                </span>
+              );
+            })}
+            <div className="relative" ref={docPickerRef}>
+              <button
+                onClick={() => setShowDocPicker(v => !v)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-slate-300 text-slate-400 hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 text-[11px] font-medium transition-colors"
+                title="Ajouter un document au contexte"
+              >
+                <Plus size={10} />
+                {contextDocIds.size === 0 && <span>Contexte</span>}
+              </button>
+              {showDocPicker && (
+                <div className="absolute left-0 top-full mt-1 z-20 bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-xl shadow-glass py-1 min-w-[160px] animate-fade-in">
+                  {otherDocuments.map(doc => (
+                    <button
+                      key={doc.id}
+                      onClick={() => { toggleContextDoc(doc.id); }}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors text-left ${
+                        contextDocIds.has(doc.id)
+                          ? 'bg-violet-50 text-violet-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileText size={11} className={contextDocIds.has(doc.id) ? 'text-violet-500' : 'text-slate-400'} />
+                      <span className="truncate flex-1">{doc.name}</span>
+                      {contextDocIds.has(doc.id) && <Check size={10} className="text-violet-500 flex-shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
