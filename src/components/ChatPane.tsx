@@ -57,14 +57,26 @@ function extractHeadingSections(markdown: string): { heading: string; content: s
 }
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
-  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild, insertSectionsAsChildren, pendingAIPrompt, setPendingAIPrompt } = useStore();
+  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild, insertSectionsAsChildren, pendingAIPrompt, setPendingAIPrompt, documents, activeDocumentId } = useStore();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [copiedId, setCopiedId] = React.useState<number | null>(null);
   const [showTemplates, setShowTemplates] = React.useState(false);
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(['discussion', 'content', 'subsections']));
+  const [showContextDocs, setShowContextDocs] = React.useState(false);
+  const [contextDocIds, setContextDocIds] = React.useState<Set<string>>(new Set());
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  const otherDocuments = documents.filter(d => d.id !== activeDocumentId);
+
+  const toggleContextDoc = (id: string) => {
+    setContextDocIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Consume pending AI prompt from sidebar enrichment action
   React.useEffect(() => {
@@ -132,6 +144,20 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
     try {
       // Construire le contexte sandwich
       const context = buildContextSandwich(tree, activeNode);
+
+      // Injecter les documents de contexte sélectionnés manuellement
+      if (contextDocIds.size > 0) {
+        const extraContext = documents
+          .filter(d => contextDocIds.has(d.id))
+          .map(d => `### Document : ${d.name}\n\n${d.markdown || '(vide)'}`)
+          .join('\n\n---\n\n');
+        if (extraContext) {
+          context.globalContext = context.globalContext
+            ? `${context.globalContext}\n\n---\n\n## Documents additionnels\n\n${extraContext}`
+            : `## Documents additionnels\n\n${extraContext}`;
+        }
+      }
+
       const systemPrompt = buildSystemPrompt(context, aiConfig.chatMode);
       const messageForAI = buildUserMessage(context, input);
 
@@ -238,6 +264,46 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
             Structuration
           </button>
         </div>
+
+        {/* Documents de contexte additionnels */}
+        {otherDocuments.length > 0 && (
+          <div className="mb-2">
+            <button
+              onClick={() => setShowContextDocs(v => !v)}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                contextDocIds.size > 0
+                  ? 'bg-violet-100/70 text-violet-700 font-semibold'
+                  : 'bg-white/40 text-slate-500 hover:bg-white/60'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <FileText size={11} />
+                {contextDocIds.size > 0
+                  ? `${contextDocIds.size} doc${contextDocIds.size > 1 ? 's' : ''} en contexte`
+                  : 'Contexte documents additionnels'}
+              </span>
+              <ChevronRight size={11} className={`transition-transform ${showContextDocs ? 'rotate-90' : ''}`} />
+            </button>
+            {showContextDocs && (
+              <div className="mt-1 px-1 space-y-0.5 animate-fade-in">
+                {otherDocuments.map(doc => (
+                  <label
+                    key={doc.id}
+                    className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/50 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={contextDocIds.has(doc.id)}
+                      onChange={() => toggleContextDoc(doc.id)}
+                      className="accent-violet-500"
+                    />
+                    <span className="text-xs text-slate-700 truncate">{doc.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-2 text-xs">
           <div className={`relative flex items-center gap-1 pl-2 pr-1 py-1 rounded-lg border ${

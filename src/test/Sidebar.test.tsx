@@ -5,7 +5,10 @@ import { useStore } from '../store';
 
 // Reset le store avant chaque test
 beforeEach(() => {
+  const defaultDocId = 'test-doc';
   useStore.setState({
+    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [] }],
+    activeDocumentId: defaultDocId,
     tree: [],
     activeNodeId: null,
     markdown: '',
@@ -19,7 +22,7 @@ beforeEach(() => {
       enabled: false,
       question: '',
     },
-  });
+  } as any);
 });
 
 describe('Sidebar', () => {
