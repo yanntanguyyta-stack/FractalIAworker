@@ -50,23 +50,29 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-resizable-panels'],
-          'clerk': ['@clerk/clerk-react'],
-          'mermaid': ['mermaid'],
-          'pdf': ['pdfjs-dist'],
-          'docx': ['mammoth', 'docx'],
-          'markdown': [
-            'react-markdown',
-            'remark-gfm',
-            'remark-parse',
-            'remark-stringify',
-            'rehype-sanitize',
-            'unified',
-            'mdast-util-find-and-replace',
-            'mdast-util-to-string',
-          ],
-          'zip': ['jszip'],
+        // Function form: match by resolved id so subpath imports
+        // (mammoth/mammoth.browser, pdfjs-dist/legacy/build/pdf, ...)
+        // and unused listings can't break the grouping.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          // NB: mermaid is intentionally NOT grouped here — its diagram
+          // definitions are dynamic-imported and Vite naturally splits
+          // them into lazy chunks; forcing them together would create
+          // one 2 MB bundle.
+          if (id.includes('pdfjs-dist')) return 'pdf'
+          if (id.includes('mammoth') || id.includes('node_modules/docx/')) return 'docx'
+          if (id.includes('@clerk/')) return 'clerk'
+          if (id.includes('jszip')) return 'zip'
+          if (
+            id.includes('react-markdown') ||
+            id.includes('remark-') ||
+            id.includes('rehype-') ||
+            id.includes('mdast-') ||
+            id.includes('node_modules/unified/')
+          ) return 'markdown'
+          if (id.includes('node_modules/react-dom/') || id.includes('node_modules/react/')) {
+            return 'react-vendor'
+          }
         },
       },
     },
