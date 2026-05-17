@@ -41,9 +41,14 @@ export interface ProjectDocument {
   markdown: string;
   history: HistorySnapshot[];
   future: HistorySnapshot[];
+  // IDs des autres documents à injecter en contexte IA (manuel, persisté par doc)
+  contextDocIds: string[];
 }
 
 const MAX_HISTORY_SIZE = 50;
+// Borne plus serrée pour ce qui est persisté en localStorage (quota ~5 Mo).
+const MAX_PERSISTED_HISTORY = 20;
+export const MAX_DOCUMENT_NAME_LENGTH = 60;
 
 // ID spécial pour le nœud H0 (document global)
 export const DOCUMENT_ROOT_ID = '__document_root__';
@@ -124,9 +129,15 @@ interface EditorState {
   // Actions Multi-documents
   createDocument: (name: string) => void;
   switchDocument: (id: string) => void;
+  switchToAdjacentDocument: (direction: 1 | -1) => void;
   renameDocument: (id: string, name: string) => void;
   deleteDocument: (id: string) => void;
-  importAsDocument: (name: string, markdown: string) => void;
+  importAsDocument: (name: string, markdown: string) => boolean;
+  setDocumentContextIds: (docId: string, contextIds: string[]) => void;
+
+  // Helpers internes (exposés pour le typage, à usage interne uniquement)
+  _pushHistory: () => void;
+  _saveCurrentDocSnapshot: () => void;
 
   // Actions Évaluation
   setAssessmentConfig: (config: AssessmentConfig) => void;
@@ -323,7 +334,7 @@ function ensureAssessmentMeta(nodes: NodeData[]): NodeData[] {
  * Returns { ok, skipped } so bulk callers can report partial success.
  */
 function applyDepthDelta(
-  get: () => EditorState & { _pushHistory?: () => void },
+  get: () => EditorState,
   set: (state: Partial<EditorState>) => void,
   nodeIds: string[],
   delta: -1 | 1,
@@ -384,8 +395,7 @@ function applyDepthDelta(
     }
   }
 
-  const _push = (get() as any)._pushHistory;
-  if (_push) _push();
+  get()._pushHistory();
 
   const updated = flat.map(n =>
     finalShift.has(n.id) ? { ...n, headingDepth: n.headingDepth + delta } : n
@@ -405,7 +415,7 @@ export const useStore = create<EditorState>()(
     (set, get) => {
       const defaultDocId = generateId();
       return ({
-      documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [] }],
+      documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [], contextDocIds: [] }],
       activeDocumentId: defaultDocId,
       tree: [],
       activeNodeId: null,
@@ -504,7 +514,7 @@ export const useStore = create<EditorState>()(
 
   deleteNodes: (nodeIds) => {
     if (nodeIds.length === 0) return 0;
-    (get() as any)._pushHistory();
+    get()._pushHistory();
     const targetIds = new Set(nodeIds);
     const flat = flattenTreeForRebuild(get().tree);
 
@@ -664,7 +674,7 @@ export const useStore = create<EditorState>()(
   updateNodeContent: (nodeId: string, content: string) => {
     const { tree } = get();
     // Sauvegarder l'état avant modification
-    (get() as any)._pushHistory();
+    get()._pushHistory();
     const updated = updateNodeInTree(tree, nodeId, { content });
     set({ tree: updated });
   },
@@ -673,7 +683,7 @@ export const useStore = create<EditorState>()(
   updateNodeHeading: (nodeId: string, heading: string) => {
     const { tree } = get();
     // Sauvegarder l'état avant modification
-    (get() as any)._pushHistory();
+    get()._pushHistory();
     const updated = updateNodeInTree(tree, nodeId, { heading });
     set({ tree: updated });
   },
@@ -691,7 +701,7 @@ export const useStore = create<EditorState>()(
 
   // Ajouter un enfant à un nœud (ou un nœud racine H1 si parentId === DOCUMENT_ROOT_ID)
   addChild: (parentId: string, heading: string, content: string = '') => {
-    (get() as any).insertSectionsAsChildren(parentId, [{ heading, content }]);
+    get().insertSectionsAsChildren(parentId, [{ heading, content }]);
   },
 
   // Insérer plusieurs sections comme enfants en une seule opération (un seul undo)
@@ -704,7 +714,7 @@ export const useStore = create<EditorState>()(
     if (!isRoot && !parent) return;
 
     const childDepth = isRoot ? 1 : parent!.headingDepth + 1;
-    (get() as any)._pushHistory();
+    get()._pushHistory();
 
     const newChildren = sections.map(s =>
       createSectionNode(s.heading, childDepth, s.content, assessmentConfig.enabled)
@@ -726,7 +736,7 @@ export const useStore = create<EditorState>()(
     const { tree, activeNodeId } = get();
     
     // Sauvegarder l'état avant modification
-    (get() as any)._pushHistory();
+    get()._pushHistory();
     
     function removeNode(nodes: NodeData[]): NodeData[] {
       return nodes
@@ -765,7 +775,7 @@ export const useStore = create<EditorState>()(
       return false;
     }
     // Sauvegarder l'état avant modification
-    (get() as any)._pushHistory();
+    get()._pushHistory();
     const clonedNode = cloneNodeWithNewIds(clipboardNode, depthDelta);
     const updated = insertNode(tree, targetId, clonedNode);
     set({ tree: updated });
@@ -788,7 +798,7 @@ export const useStore = create<EditorState>()(
       return false;
     }
     // Sauvegarder l'état avant modification
-    (get() as any)._pushHistory();
+    get()._pushHistory();
     const depthDelta = newDepth - node.headingDepth;
     const adjustedNode = adjustNodeDepth(node, depthDelta);
     const removedResult = removeNodeById(tree, nodeId);
@@ -864,14 +874,16 @@ export const useStore = create<EditorState>()(
   },
 
   createDocument: (name: string) => {
-    (get() as any)._saveCurrentDocSnapshot();
+    get()._saveCurrentDocSnapshot();
+    const trimmedName = name.trim().slice(0, MAX_DOCUMENT_NAME_LENGTH) || 'Sans titre';
     const newDoc: ProjectDocument = {
       id: generateId(),
-      name,
+      name: trimmedName,
       tree: [],
       markdown: '',
       history: [],
       future: [],
+      contextDocIds: [],
     };
     const { documents } = get();
     set({
@@ -888,7 +900,7 @@ export const useStore = create<EditorState>()(
   switchDocument: (id: string) => {
     const { activeDocumentId } = get();
     if (id === activeDocumentId) return;
-    (get() as any)._saveCurrentDocSnapshot();
+    get()._saveCurrentDocSnapshot();
     const { documents } = get();
     const target = documents.find(d => d.id === id);
     if (!target) return;
@@ -902,26 +914,44 @@ export const useStore = create<EditorState>()(
     });
   },
 
+  // Navigation clavier: Ctrl+Tab (1) / Ctrl+Shift+Tab (-1)
+  switchToAdjacentDocument: (direction) => {
+    const { documents, activeDocumentId } = get();
+    if (documents.length <= 1) return;
+    const idx = documents.findIndex(d => d.id === activeDocumentId);
+    if (idx === -1) return;
+    const nextIdx = (idx + direction + documents.length) % documents.length;
+    get().switchDocument(documents[nextIdx].id);
+  },
+
   renameDocument: (id: string, name: string) => {
-    (get() as any)._saveCurrentDocSnapshot();
+    get()._saveCurrentDocSnapshot();
     const { documents } = get();
-    set({ documents: documents.map(d => d.id === id ? { ...d, name } : d) });
+    const trimmed = name.trim().slice(0, MAX_DOCUMENT_NAME_LENGTH);
+    if (!trimmed) return; // nom vide refusé
+    set({ documents: documents.map(d => d.id === id ? { ...d, name: trimmed } : d) });
   },
 
   deleteDocument: (id: string) => {
     const { documents, activeDocumentId } = get();
     if (documents.length <= 1) return; // garder au moins 1 document
-    (get() as any)._saveCurrentDocSnapshot();
+    get()._saveCurrentDocSnapshot();
     const remaining = documents.filter(d => d.id !== id);
+    // Nettoyer les références contextDocIds qui pointent vers le document supprimé
+    const cleaned = remaining.map(d =>
+      d.contextDocIds.includes(id)
+        ? { ...d, contextDocIds: d.contextDocIds.filter(cid => cid !== id) }
+        : d
+    );
     if (id !== activeDocumentId) {
-      set({ documents: remaining });
+      set({ documents: cleaned });
       return;
     }
     // Switcher vers le document précédent ou premier restant
     const deletedIndex = documents.findIndex(d => d.id === id);
-    const nextDoc = remaining[Math.max(0, deletedIndex - 1)];
+    const nextDoc = cleaned[Math.max(0, deletedIndex - 1)];
     set({
-      documents: remaining,
+      documents: cleaned,
       activeDocumentId: nextDoc.id,
       tree: nextDoc.tree,
       markdown: nextDoc.markdown,
@@ -931,18 +961,26 @@ export const useStore = create<EditorState>()(
     });
   },
 
-  importAsDocument: (name: string, markdown: string) => {
-    (get() as any)._saveCurrentDocSnapshot();
-    const { assessmentConfig, documents } = get();
+  // Importer un Markdown comme nouveau document. Renvoie false si le contenu
+  // ne produit aucun nœud et que le markdown brut est vide — le caller peut
+  // alors avertir l'utilisateur au lieu de créer un doc fantôme.
+  importAsDocument: (name: string, markdown: string): boolean => {
+    const trimmedName = name.trim().slice(0, MAX_DOCUMENT_NAME_LENGTH) || 'Sans titre';
+    const trimmedMd = markdown.trim();
     const parsed = parseMarkdownToTree(markdown);
+    if (parsed.length === 0 && trimmedMd === '') return false;
+
+    get()._saveCurrentDocSnapshot();
+    const { assessmentConfig, documents } = get();
     const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsed) : parsed;
     const newDoc: ProjectDocument = {
       id: generateId(),
-      name,
+      name: trimmedName,
       tree,
       markdown,
       history: [],
       future: [],
+      contextDocIds: [],
     };
     set({
       documents: [...documents, newDoc],
@@ -952,6 +990,18 @@ export const useStore = create<EditorState>()(
       history: [],
       future: [],
       ...TRANSIENT_RESET,
+    });
+    return true;
+  },
+
+  setDocumentContextIds: (docId: string, contextIds: string[]) => {
+    const { documents } = get();
+    // Filtrer les IDs invalides : seulement d'autres docs existants.
+    const valid = contextIds.filter(id => id !== docId && documents.some(d => d.id === id));
+    set({
+      documents: documents.map(d =>
+        d.id === docId ? { ...d, contextDocIds: valid } : d
+      ),
     });
   },
 
@@ -1066,13 +1116,27 @@ export const useStore = create<EditorState>()(
       partialize: (state) => ({
         aiConfig: state.aiConfig,
         assessmentConfig: state.assessmentConfig,
-        documents: state.documents,
+        // L'historique peut exploser le quota localStorage (~5 Mo) sur un
+        // projet vivant — on cappe ce qu'on persiste, mais on garde l'undo
+        // complet en mémoire (MAX_HISTORY_SIZE).
+        documents: state.documents.map(d => ({
+          ...d,
+          history: d.history.slice(-MAX_PERSISTED_HISTORY),
+          future: d.future.slice(0, MAX_PERSISTED_HISTORY),
+        })),
         activeDocumentId: state.activeDocumentId,
       }),
       // After rehydration, hydrate the top-level mirror fields from the
       // active document so the editor doesn't render an empty tree.
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+        // Champ ajouté tardivement : garantir contextDocIds = [] pour les
+        // documents persistés avant son introduction.
+        if (state.documents) {
+          state.documents = state.documents.map((d: ProjectDocument) =>
+            d.contextDocIds ? d : { ...d, contextDocIds: [] }
+          );
+        }
         const activeDoc = state.documents?.find((d: ProjectDocument) => d.id === state.activeDocumentId);
         if (activeDoc) {
           state.tree = activeDoc.tree;

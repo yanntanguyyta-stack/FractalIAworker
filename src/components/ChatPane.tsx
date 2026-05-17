@@ -41,7 +41,7 @@ const promptTemplates = [
 ];
 
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
-  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild, insertSectionsAsChildren, pendingAIPrompt, setPendingAIPrompt, documents, activeDocumentId } = useStore();
+  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild, insertSectionsAsChildren, pendingAIPrompt, setPendingAIPrompt, documents, activeDocumentId, setDocumentContextIds } = useStore();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -49,17 +49,19 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
   const [showTemplates, setShowTemplates] = React.useState(false);
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(['discussion', 'content', 'subsections']));
   const [showContextDocs, setShowContextDocs] = React.useState(false);
-  const [contextDocIds, setContextDocIds] = React.useState<Set<string>>(new Set());
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
+  const activeDoc = documents.find(d => d.id === activeDocumentId);
+  const contextDocIds = React.useMemo(
+    () => new Set(activeDoc?.contextDocIds ?? []),
+    [activeDoc]
+  );
   const otherDocuments = documents.filter(d => d.id !== activeDocumentId);
 
   const toggleContextDoc = (id: string) => {
-    setContextDocIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    const next = new Set(contextDocIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setDocumentContextIds(activeDocumentId, Array.from(next));
   };
 
   // Consume pending AI prompt from sidebar enrichment action
@@ -126,21 +128,10 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
     setLoading(true);
 
     try {
-      // Construire le contexte sandwich
-      const context = buildContextSandwich(tree, activeNode);
-
-      // Injecter les documents de contexte sélectionnés manuellement
-      if (contextDocIds.size > 0) {
-        const extraContext = documents
-          .filter(d => contextDocIds.has(d.id))
-          .map(d => `### Document : ${d.name}\n\n${d.markdown || '(vide)'}`)
-          .join('\n\n---\n\n');
-        if (extraContext) {
-          context.globalContext = context.globalContext
-            ? `${context.globalContext}\n\n---\n\n## Documents additionnels\n\n${extraContext}`
-            : `## Documents additionnels\n\n${extraContext}`;
-        }
-      }
+      const extraDocs = documents
+        .filter(d => contextDocIds.has(d.id))
+        .map(d => ({ name: d.name, markdown: d.markdown }));
+      const context = buildContextSandwich(tree, activeNode, extraDocs);
 
       const systemPrompt = buildSystemPrompt(context, aiConfig.chatMode);
       const messageForAI = buildUserMessage(context, input);

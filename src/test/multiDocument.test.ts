@@ -4,7 +4,7 @@ import { useStore } from '../store';
 beforeEach(() => {
   const defaultDocId = 'doc-default';
   useStore.setState({
-    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [] }],
+    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [], contextDocIds: [] }],
     activeDocumentId: defaultDocId,
     tree: [],
     markdown: '',
@@ -114,6 +114,80 @@ describe('multi-document — store actions', () => {
     expect(useStore.getState().documents).toHaveLength(1);
     expect(useStore.getState().activeDocumentId).toBe(firstId);
     expect(useStore.getState().tree[0].heading).toBe('First');
+  });
+
+  it('importAsDocument returns false when given blank markdown', () => {
+    const before = useStore.getState().documents.length;
+    const ok = useStore.getState().importAsDocument('Vide', '   \n\n  ');
+    expect(ok).toBe(false);
+    expect(useStore.getState().documents).toHaveLength(before);
+  });
+
+  it('importAsDocument returns true for non-empty input', () => {
+    const ok = useStore.getState().importAsDocument('Plein', '# Hello');
+    expect(ok).toBe(true);
+  });
+
+  it('createDocument caps the name length', () => {
+    const longName = 'x'.repeat(200);
+    useStore.getState().createDocument(longName);
+    const created = useStore.getState().documents.at(-1)!;
+    expect(created.name.length).toBeLessThanOrEqual(60);
+  });
+
+  it('renameDocument ignores empty/whitespace names', () => {
+    const id = useStore.getState().activeDocumentId;
+    const before = useStore.getState().documents[0].name;
+    useStore.getState().renameDocument(id, '   ');
+    expect(useStore.getState().documents[0].name).toBe(before);
+  });
+
+  it('switchToAdjacentDocument cycles forward and backward', () => {
+    useStore.getState().createDocument('B');
+    useStore.getState().createDocument('C');
+    const ids = useStore.getState().documents.map(d => d.id);
+    // Active = C (last created)
+    expect(useStore.getState().activeDocumentId).toBe(ids[2]);
+
+    useStore.getState().switchToAdjacentDocument(1); // wrap to 0
+    expect(useStore.getState().activeDocumentId).toBe(ids[0]);
+
+    useStore.getState().switchToAdjacentDocument(-1); // wrap to last
+    expect(useStore.getState().activeDocumentId).toBe(ids[2]);
+
+    useStore.getState().switchToAdjacentDocument(-1);
+    expect(useStore.getState().activeDocumentId).toBe(ids[1]);
+  });
+
+  it('setDocumentContextIds stores cross-document AI context per document', () => {
+    useStore.getState().createDocument('Personnages');
+    const personnagesId = useStore.getState().activeDocumentId;
+    const manuscriptId = useStore.getState().documents[0].id;
+
+    useStore.getState().setDocumentContextIds(manuscriptId, [personnagesId]);
+    const manuscript = useStore.getState().documents.find(d => d.id === manuscriptId)!;
+    expect(manuscript.contextDocIds).toEqual([personnagesId]);
+  });
+
+  it('setDocumentContextIds rejects self-reference and unknown ids', () => {
+    useStore.getState().createDocument('Other');
+    const otherId = useStore.getState().activeDocumentId;
+    const firstId = useStore.getState().documents[0].id;
+
+    useStore.getState().setDocumentContextIds(otherId, [otherId, 'ghost-id', firstId]);
+    const other = useStore.getState().documents.find(d => d.id === otherId)!;
+    expect(other.contextDocIds).toEqual([firstId]);
+  });
+
+  it('deleteDocument cleans contextDocIds references on remaining docs', () => {
+    useStore.getState().createDocument('Personnages');
+    const personnagesId = useStore.getState().activeDocumentId;
+    const manuscriptId = useStore.getState().documents[0].id;
+    useStore.getState().setDocumentContextIds(manuscriptId, [personnagesId]);
+
+    useStore.getState().deleteDocument(personnagesId);
+    const manuscript = useStore.getState().documents.find(d => d.id === manuscriptId)!;
+    expect(manuscript.contextDocIds).toEqual([]);
   });
 
   it('importAsDocument parses markdown into a new active document', () => {

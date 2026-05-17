@@ -172,18 +172,33 @@ function buildFullDocumentContent(nodes: NodeData[]): string {
   return content;
 }
 
+export interface ExtraContextDocument {
+  name: string;
+  markdown: string;
+}
+
 /**
- * Construire le contexte sandwich pour un appel API IA
+ * Construire le contexte sandwich pour un appel API IA.
+ * `extraDocuments` (optionnel) : documents annexes du projet à injecter dans
+ * le contexte global (ex : liste des personnages quand on rédige le manuscrit).
  */
 export function buildContextSandwich(
   tree: NodeData[],
-  activeNode: NodeData | null
+  activeNode: NodeData | null,
+  extraDocuments: ExtraContextDocument[] = []
 ): AIContextSandwich {
   // Couche 1: Contexte global (tous les nœuds avec isGlobal: true)
   const globalNodes = filterGlobalNodes(tree);
-  const globalContext = globalNodes
-    .map(n => `## ${n.heading}\n${n.content}`)
-    .join('\n\n');
+  const globalParts: string[] = globalNodes.map(n => `## ${n.heading}\n${n.content}`);
+
+  if (extraDocuments.length > 0) {
+    const extra = extraDocuments
+      .map(d => `### Document : ${d.name}\n\n${d.markdown.trim() || '(vide)'}`)
+      .join('\n\n---\n\n');
+    globalParts.push(`## Documents additionnels\n\n${extra}`);
+  }
+
+  const globalContext = globalParts.join('\n\n');
 
   // Couche 2: Contexte hiérarchique (chemin des ancêtres)
   const nodePath = activeNode ? findNodePath(tree, activeNode.id) : [];

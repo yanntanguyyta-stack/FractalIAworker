@@ -232,7 +232,12 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
         loadMarkdown(currentMarkdown + '\n\n' + markdown);
       } else {
         const docName = file?.name.replace(/\.[^.]+$/, '') || 'Document importé';
-        importAsDocument(docName, markdown);
+        const ok = importAsDocument(docName, markdown);
+        if (!ok) {
+          setError('Le fichier importé est vide — aucun document créé.');
+          setIsLoading(false);
+          return;
+        }
       }
 
       setStep('import');
@@ -254,7 +259,11 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
       loadMarkdown(currentMarkdown + '\n\n' + markdown);
     } else {
       const docName = file?.name.replace(/\.[^.]+$/, '') || 'Document importé';
-      importAsDocument(docName, markdown);
+      const ok = importAsDocument(docName, markdown);
+      if (!ok) {
+        setError('Le fichier importé est vide — aucun document créé.');
+        return;
+      }
     }
     setStep('import');
     setTimeout(() => handleClose(), 1500);
