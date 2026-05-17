@@ -7,6 +7,8 @@ import {
   updateNodeInTree,
   findNodeById,
   flattenTree,
+  flattenTreeForRebuild,
+  rebuildTreeFromFlat,
 } from './markdownEngine';
 
 // Configuration IA
@@ -40,6 +42,9 @@ interface EditorState {
   // Données
   tree: NodeData[];
   activeNodeId: string | null;  // null ou DOCUMENT_ROOT_ID = vue document complet
+  selectedNodeIds: Set<string>;  // sélection multiple pour opérations groupées
+  lastSelectedNodeId: string | null;  // dernière sélection pour shift-click
+  recentlyMovedNodeId: string | null;  // pour highlight/scroll après une opération
   markdown: string;
   clipboardNode: NodeData | null;
   
@@ -80,9 +85,21 @@ interface EditorState {
   canUndo: () => boolean;
   canRedo: () => boolean;
   
-  // Actions de niveau de nœud
+  // Actions de niveau de nœud (préservent l'ordre du document)
   promoteNode: (nodeId: string, withChildren: boolean) => boolean;
   demoteNode: (nodeId: string, withChildren: boolean) => boolean;
+
+  // Opérations groupées (une seule entrée d'historique)
+  promoteNodes: (nodeIds: string[], withChildren: boolean) => { ok: number; skipped: number };
+  demoteNodes: (nodeIds: string[], withChildren: boolean) => { ok: number; skipped: number };
+  deleteNodes: (nodeIds: string[]) => number;
+
+  // Sélection multiple
+  toggleNodeSelection: (nodeId: string) => void;
+  selectRangeTo: (nodeId: string) => void;
+  setSelection: (nodeIds: string[]) => void;
+  clearSelection: () => void;
+  clearRecentlyMoved: () => void;
   
   // Actions IA
   setAIConfig: (config: AIConfig) => void;
@@ -241,11 +258,105 @@ function ensureAssessmentMeta(nodes: NodeData[]): NodeData[] {
   });
 }
 
+/**
+ * Apply a +1 / -1 depth delta to a set of nodes (and optionally their
+ * descendants), while preserving document order. The tree is then
+ * re-derived from the flat doc-ordered list using stack-based
+ * hierarchy rules.
+ *
+ * - delta < 0: promote (H3 → H2). Stops at headingDepth=1.
+ * - delta > 0: demote. Stops at MAX_HEADING_DEPTH.
+ * - withChildren=true: every descendant's depth also shifts by delta
+ *   (preserves the relative shape of the sub-tree).
+ *
+ * Returns { ok, skipped } so bulk callers can report partial success.
+ */
+function applyDepthDelta(
+  get: () => EditorState & { _pushHistory?: () => void },
+  set: (state: Partial<EditorState>) => void,
+  nodeIds: string[],
+  delta: -1 | 1,
+  withChildren: boolean
+): { ok: number; skipped: number } {
+  if (nodeIds.length === 0) return { ok: 0, skipped: 0 };
+
+  const state = get();
+  const flat = flattenTreeForRebuild(state.tree);
+
+  // For each target: descendants are consecutive doc-ordered entries with
+  // strictly greater headingDepth, until we hit a sibling or shallower entry.
+  // We compute the final shift set after validation (below) — no need for a
+  // pre-pass.
+  const idSet = new Set(nodeIds);
+
+  // Validate: a promote is only valid if no shifted node would go below 1;
+  // a demote is only valid if no shifted node would exceed MAX_HEADING_DEPTH.
+  // Targets that fail validation are skipped (entire shift block for that
+  // target is preserved unchanged).
+  const okIds = new Set<string>();
+  const skippedIds = new Set<string>();
+
+  for (let i = 0; i < flat.length; i++) {
+    if (!idSet.has(flat[i].id)) continue;
+    const baseDepth = flat[i].headingDepth;
+    const newDepth = baseDepth + delta;
+    if (newDepth < 1 || newDepth > MAX_HEADING_DEPTH) {
+      skippedIds.add(flat[i].id);
+      continue;
+    }
+    if (withChildren) {
+      let subtreeMax = baseDepth;
+      for (let j = i + 1; j < flat.length; j++) {
+        if (flat[j].headingDepth <= baseDepth) break;
+        subtreeMax = Math.max(subtreeMax, flat[j].headingDepth);
+      }
+      if (subtreeMax + delta > MAX_HEADING_DEPTH) {
+        skippedIds.add(flat[i].id);
+        continue;
+      }
+    }
+    okIds.add(flat[i].id);
+  }
+
+  if (okIds.size === 0) return { ok: 0, skipped: skippedIds.size };
+
+  // Re-compute shiftIds limited to OK targets only.
+  const finalShift = new Set<string>();
+  for (let i = 0; i < flat.length; i++) {
+    if (!okIds.has(flat[i].id)) continue;
+    finalShift.add(flat[i].id);
+    if (!withChildren) continue;
+    const baseDepth = flat[i].headingDepth;
+    for (let j = i + 1; j < flat.length; j++) {
+      if (flat[j].headingDepth <= baseDepth) break;
+      finalShift.add(flat[j].id);
+    }
+  }
+
+  const _push = (get() as any)._pushHistory;
+  if (_push) _push();
+
+  const updated = flat.map(n =>
+    finalShift.has(n.id) ? { ...n, headingDepth: n.headingDepth + delta } : n
+  );
+  const newTree = rebuildTreeFromFlat(updated);
+
+  set({
+    tree: newTree,
+    recentlyMovedNodeId: nodeIds.find(id => okIds.has(id)) ?? null,
+  });
+
+  return { ok: okIds.size, skipped: skippedIds.size };
+}
+
 export const useStore = create<EditorState>()(
   persist(
     (set, get) => ({
       tree: [],
       activeNodeId: null,
+      selectedNodeIds: new Set<string>(),
+      lastSelectedNodeId: null,
+      recentlyMovedNodeId: null,
       markdown: '',
       clipboardNode: null,
       history: [],
@@ -313,81 +424,96 @@ export const useStore = create<EditorState>()(
   canRedo: () => get().future.length > 0,
 
   // Promouvoir un nœud : le remonter d'un niveau dans l'arbre
-  promoteNode: (nodeId: string, withChildren: boolean) => {
-    const { tree } = get();
-    const node = findNodeById(tree, nodeId);
-    if (!node || node.headingDepth <= 1) return false;
-    
-    // Vérifier que le nœud n'est pas déjà à la racine de l'arbre
-    const location = findNodeLocation(tree, nodeId);
-    if (!location || !location.parent) return false;
-    
-    (get() as any)._pushHistory();
-    
-    // Deep clone pour mutation immutable
-    const newTree = JSON.parse(JSON.stringify(tree)) as NodeData[];
-    const loc = findNodeLocation(newTree, nodeId);
-    if (!loc || !loc.parent) return false;
-    
-    // Retirer le nœud de son parent
-    const [removedNode] = loc.container.splice(loc.index, 1);
-    
-    // Ajuster la profondeur
-    const adjusted = withChildren
-      ? adjustNodeDepth(removedNode, -1)
-      : { ...removedNode, headingDepth: removedNode.headingDepth - 1 };
-    
-    // Trouver le parent dans l'arbre et insérer après lui
-    const parentLoc = findNodeLocation(newTree, loc.parent.id);
-    if (!parentLoc) return false;
-    
-    parentLoc.container.splice(parentLoc.index + 1, 0, adjusted);
-    
-    set({ tree: newTree });
-    return true;
+  // Promote: décrémente le headingDepth puis re-dérive l'arbre depuis la liste
+  // doc-ordered. Le nœud ne bouge PAS dans l'ordre du document — seule sa
+  // hiérarchie change. withChildren=true décale aussi tous ses descendants
+  // pour préserver la structure relative du sous-arbre.
+  promoteNode: (nodeId, withChildren) => {
+    const result = applyDepthDelta(get, set, [nodeId], -1, withChildren);
+    return result.ok > 0;
   },
 
-  // Rétrograder un nœud : le descendre d'un niveau (devient enfant du frère précédent)
-  demoteNode: (nodeId: string, withChildren: boolean) => {
-    const { tree } = get();
-    const node = findNodeById(tree, nodeId);
-    if (!node) return false;
-    
-    // Vérifier la profondeur maximale
-    const maxDepth = getSubtreeMaxDepth(node);
-    if (node.headingDepth + 1 > MAX_HEADING_DEPTH ||
-        (withChildren && maxDepth + 1 > MAX_HEADING_DEPTH)) {
-      return false;
-    }
-    
-    // Trouver l'emplacement du nœud et vérifier qu'il a un frère précédent
-    const location = findNodeLocation(tree, nodeId);
-    if (!location || location.index === 0) return false;
-    
-    (get() as any)._pushHistory();
-    
-    // Deep clone pour mutation immutable
-    const newTree = JSON.parse(JSON.stringify(tree)) as NodeData[];
-    const loc = findNodeLocation(newTree, nodeId);
-    if (!loc || loc.index === 0) return false;
-    
-    // Obtenir le frère précédent
-    const prevSibling = loc.container[loc.index - 1];
-    
-    // Retirer le nœud de sa position actuelle
-    const [removedNode] = loc.container.splice(loc.index, 1);
-    
-    // Ajuster la profondeur
-    const adjusted = withChildren
-      ? adjustNodeDepth(removedNode, 1)
-      : { ...removedNode, headingDepth: removedNode.headingDepth + 1 };
-    
-    // Ajouter comme dernier enfant du frère précédent
-    prevSibling.children.push(adjusted);
-    
-    set({ tree: newTree });
-    return true;
+  // Demote: incrémente le headingDepth. Comme pour promote, doc-order
+  // préservé. Le nouveau parent est dérivé naturellement par l'algorithme
+  // de stack (typiquement le H{n-1} qui le précède dans le doc).
+  demoteNode: (nodeId, withChildren) => {
+    const result = applyDepthDelta(get, set, [nodeId], 1, withChildren);
+    return result.ok > 0;
   },
+
+  promoteNodes: (nodeIds, withChildren) =>
+    applyDepthDelta(get, set, nodeIds, -1, withChildren),
+
+  demoteNodes: (nodeIds, withChildren) =>
+    applyDepthDelta(get, set, nodeIds, 1, withChildren),
+
+  deleteNodes: (nodeIds) => {
+    if (nodeIds.length === 0) return 0;
+    (get() as any)._pushHistory();
+    const targetIds = new Set(nodeIds);
+    const flat = flattenTreeForRebuild(get().tree);
+
+    // Expand targets to include each subtree (consecutive doc-ordered entries
+    // with strictly greater headingDepth) so deletion cascades like the
+    // single-node deleteNode.
+    const idSet = new Set<string>();
+    for (let i = 0; i < flat.length; i++) {
+      if (!targetIds.has(flat[i].id)) continue;
+      idSet.add(flat[i].id);
+      const baseDepth = flat[i].headingDepth;
+      for (let j = i + 1; j < flat.length; j++) {
+        if (flat[j].headingDepth <= baseDepth) break;
+        idSet.add(flat[j].id);
+      }
+    }
+
+    const filtered = flat.filter(n => !idSet.has(n.id));
+    const removed = flat.length - filtered.length;
+    const newTree = rebuildTreeFromFlat(filtered);
+    const { activeNodeId, selectedNodeIds } = get();
+    const newSelected = new Set(selectedNodeIds);
+    nodeIds.forEach(id => newSelected.delete(id));
+    set({
+      tree: newTree,
+      activeNodeId: activeNodeId && idSet.has(activeNodeId) ? DOCUMENT_ROOT_ID : activeNodeId,
+      selectedNodeIds: newSelected,
+    });
+    return removed;
+  },
+
+  toggleNodeSelection: (nodeId) => {
+    const { selectedNodeIds } = get();
+    const next = new Set(selectedNodeIds);
+    if (next.has(nodeId)) next.delete(nodeId);
+    else next.add(nodeId);
+    set({ selectedNodeIds: next, lastSelectedNodeId: nodeId });
+  },
+
+  selectRangeTo: (nodeId) => {
+    const { tree, lastSelectedNodeId, selectedNodeIds } = get();
+    if (!lastSelectedNodeId) {
+      const next = new Set(selectedNodeIds);
+      next.add(nodeId);
+      set({ selectedNodeIds: next, lastSelectedNodeId: nodeId });
+      return;
+    }
+    const flat = flattenTree(tree);
+    const iStart = flat.findIndex(n => n.id === lastSelectedNodeId);
+    const iEnd = flat.findIndex(n => n.id === nodeId);
+    if (iStart === -1 || iEnd === -1) return;
+    const [lo, hi] = iStart < iEnd ? [iStart, iEnd] : [iEnd, iStart];
+    const next = new Set(selectedNodeIds);
+    for (let k = lo; k <= hi; k++) next.add(flat[k].id);
+    set({ selectedNodeIds: next, lastSelectedNodeId: nodeId });
+  },
+
+  setSelection: (nodeIds) =>
+    set({ selectedNodeIds: new Set(nodeIds), lastSelectedNodeId: nodeIds[nodeIds.length - 1] ?? null }),
+
+  clearSelection: () =>
+    set({ selectedNodeIds: new Set(), lastSelectedNodeId: null }),
+
+  clearRecentlyMoved: () => set({ recentlyMovedNodeId: null }),
 
   // Charger le Markdown et parser l'arbre
   loadMarkdown: (markdown: string) => {
@@ -395,12 +521,20 @@ export const useStore = create<EditorState>()(
     const { assessmentConfig } = get();
     const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsedTree) : parsedTree;
     // Par défaut, sélectionner le document complet (H0)
-    set({ tree, markdown, activeNodeId: DOCUMENT_ROOT_ID, history: [], future: [] });
+    set({
+      tree, markdown, activeNodeId: DOCUMENT_ROOT_ID,
+      history: [], future: [],
+      selectedNodeIds: new Set(), lastSelectedNodeId: null, recentlyMovedNodeId: null,
+    });
   },
 
   // Charger un arbre directement (restauration depuis le stockage utilisateur)
   loadTree: (tree: NodeData[]) => {
-    set({ tree, activeNodeId: DOCUMENT_ROOT_ID, history: [], future: [] });
+    set({
+      tree, activeNodeId: DOCUMENT_ROOT_ID,
+      history: [], future: [],
+      selectedNodeIds: new Set(), lastSelectedNodeId: null, recentlyMovedNodeId: null,
+    });
   },
 
   // Sauvegarder l'arbre en Markdown

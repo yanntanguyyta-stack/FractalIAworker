@@ -211,3 +211,48 @@ export function flattenTree(tree: NodeData[]): NodeData[] {
   traverse(tree);
   return result;
 }
+
+/**
+ * Returns the flat list of nodes in document order, each cloned with
+ * an empty `children` array (children are derivable from doc-order +
+ * headingDepth via `rebuildTreeFromFlat`). Use this as the input to
+ * promote/demote/bulk operations that should preserve doc order.
+ */
+export function flattenTreeForRebuild(tree: NodeData[]): NodeData[] {
+  const result: NodeData[] = [];
+  function traverse(nodes: NodeData[]) {
+    for (const node of nodes) {
+      result.push({ ...node, children: [] });
+      if (node.children.length > 0) traverse(node.children);
+    }
+  }
+  traverse(tree);
+  return result;
+}
+
+/**
+ * Re-builds a tree from a flat doc-ordered list using the same
+ * stack-based hierarchy rules as the markdown parser. Each input
+ * node's `headingDepth` is the source of truth for nesting. Inputs
+ * are not mutated — each entry is shallow-cloned with a fresh
+ * `children` array.
+ */
+export function rebuildTreeFromFlat(flatNodes: NodeData[]): NodeData[] {
+  const tree: NodeData[] = [];
+  const stack: { node: NodeData; depth: number }[] = [];
+
+  for (const entry of flatNodes) {
+    const node: NodeData = { ...entry, children: [] };
+    while (stack.length > 0 && stack[stack.length - 1].depth >= node.headingDepth) {
+      stack.pop();
+    }
+    if (stack.length === 0) {
+      tree.push(node);
+    } else {
+      stack[stack.length - 1].node.children.push(node);
+    }
+    stack.push({ node, depth: node.headingDepth });
+  }
+
+  return tree;
+}
