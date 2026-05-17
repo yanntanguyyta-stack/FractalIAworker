@@ -5,7 +5,7 @@ import {
   ChevronUp as LevelUp, ChevronDown as LevelDown, Sparkles,
   Wrench, ArrowRight, FolderOpen,
 } from 'lucide-react';
-import { useStore, DOCUMENT_ROOT_ID, ProjectDocument, DocumentType } from '../store';
+import { useStore, DOCUMENT_ROOT_ID, ProjectDocument, DocumentType, MAX_DOCUMENT_NAME_LENGTH } from '../store';
 import { exportProjectToZip } from '../utils/projectExport';
 import ProjectSwitcher from './ProjectSwitcher';
 import { NodeData } from '../types';
@@ -521,6 +521,36 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
         </button>
       </div>
 
+      {/* ── Nom du document principal (avec rename inline) ───────────────── */}
+      {!isEditingTool && mainDoc && (
+        <div className="flex items-center gap-1 px-3 pt-1.5 pb-1 flex-shrink-0">
+          <FileText size={11} className="text-accent-400 flex-shrink-0" />
+          {renamingDocId === mainDoc.id ? (
+            <input
+              ref={renameInputRef}
+              className="flex-1 text-xs bg-transparent border-b border-accent-400 outline-none text-slate-900 min-w-0"
+              maxLength={MAX_DOCUMENT_NAME_LENGTH}
+              value={renameValue}
+              onChange={e => setRenameValue(e.target.value)}
+              onBlur={() => commitRename(mainDoc.id)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitRename(mainDoc.id);
+                if (e.key === 'Escape') cancelRename();
+              }}
+            />
+          ) : (
+            <span className="flex-1 text-xs text-slate-600 font-medium truncate">{mainDoc.name}</span>
+          )}
+          <button
+            onClick={() => startRename(mainDoc.id, mainDoc.name)}
+            className="icon-btn-sm text-slate-300 hover:text-accent-600 flex-shrink-0"
+            title="Renommer le document principal"
+          >
+            <Pencil size={10} />
+          </button>
+        </div>
+      )}
+
       {/* ── Bandeau "retour au document principal" si on édite un outil ── */}
       {isEditingTool && mainDoc && (
         <div className="flex-shrink-0 mx-2 mt-2 mb-0 px-3 py-1.5 rounded-xl bg-amber-50/70 border border-amber-200/60 flex items-center gap-2 animate-fade-in">
@@ -753,7 +783,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   <input
                     ref={renameInputRef}
                     className="flex-1 text-xs bg-transparent border-b border-accent-400 outline-none text-slate-900 min-w-0"
-                    maxLength={60}
+                    maxLength={MAX_DOCUMENT_NAME_LENGTH}
                     value={renameValue}
                     onChange={e => setRenameValue(e.target.value)}
                     onBlur={() => commitRename(doc.id)}
@@ -767,7 +797,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                   <span className="flex-1 text-xs font-medium text-slate-700 truncate">{doc.name}</span>
                 )}
                 <span className="text-[10px] text-slate-400 font-mono flex-shrink-0">
-                  {doc.tree.length > 0 ? `${doc.tree.reduce((acc, n) => acc + 1 + n.children.length, 0)}` : '—'}
+                  {doc.tree.length > 0 ? `${countAllNodes(doc.tree)}` : '—'}
                 </span>
                 <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 flex-shrink-0 transition-opacity">
                   <button

@@ -1069,8 +1069,14 @@ export const useStore = create<EditorState>()(
 
   // Changer le type d'un document (main/tool).
   // Passer 'main' rétrograde tous les autres en 'tool' (un seul principal par projet).
+  // Passer 'tool' sur le seul doc main est ignoré (invariant : 1 main minimum).
   setDocumentType: (docId: string, type: DocumentType) => {
+    get()._saveCurrentDocSnapshot();
     const { documents, projects, activeProjectId } = get();
+    if (type === 'tool') {
+      const currentMain = documents.find(d => d.type === 'main');
+      if (currentMain?.id === docId && !documents.some(d => d.id !== docId && d.type === 'main')) return;
+    }
     const updatedDocs = documents.map(d => ({
       ...d,
       type: d.id === docId ? type : (type === 'main' ? 'tool' : d.type),
@@ -1143,12 +1149,14 @@ export const useStore = create<EditorState>()(
     const { projects, activeProjectId } = get();
     if (projects.length <= 1) return;
     get()._saveCurrentDocSnapshot();
-    const remaining = projects.filter(p => p.id !== id);
+    // Re-read after snapshot (snapshot may have mutated projects[])
+    const { projects: refreshedProjects } = get();
+    const remaining = refreshedProjects.filter(p => p.id !== id);
     if (id !== activeProjectId) {
       set({ projects: remaining });
       return;
     }
-    const deletedIndex = projects.findIndex(p => p.id === id);
+    const deletedIndex = refreshedProjects.findIndex(p => p.id === id);
     const nextProject = remaining[Math.max(0, deletedIndex - 1)];
     const activeDoc = nextProject.documents.find(d => d.id === nextProject.activeDocumentId)
       ?? nextProject.documents[0];
@@ -1294,14 +1302,15 @@ export const useStore = create<EditorState>()(
         // v1 persisted documents[] + activeDocumentId at top level (no projects).
         // Wrap them in a single "Mon projet" project.
         if (!state.projects && (state as any).documents) {
+          const legacyActiveDocId: string = (state as any).activeDocumentId ?? ((state as any).documents as any[])[0]?.id ?? '';
           const legacyDocs: ProjectDocument[] = ((state as any).documents as any[]).map(
-            (d: any, i: number) => ({
+            (d: any) => ({
               ...d,
               contextDocIds: d.contextDocIds ?? [],
-              type: (i === 0 ? 'main' : 'tool') as DocumentType,
+              // The previously active document becomes main; everything else is a tool doc.
+              type: (d.id === legacyActiveDocId ? 'main' : 'tool') as DocumentType,
             })
           );
-          const legacyActiveDocId = (state as any).activeDocumentId ?? legacyDocs[0]?.id ?? '';
           const migratedProject: Project = {
             id: generateId(),
             name: 'Mon projet',
@@ -1315,14 +1324,27 @@ export const useStore = create<EditorState>()(
 
         // ── Normalisation ────────────────────────────────────────────────────
         if (state.projects) {
-          state.projects = state.projects.map((p: Project) => ({
-            ...p,
-            documents: p.documents.map((d: ProjectDocument) => ({
+          state.projects = state.projects.map((p: Project) => {
+            const normalized = p.documents.map((d: ProjectDocument) => ({
               ...d,
               contextDocIds: d.contextDocIds ?? [],
-              type: d.type ?? 'tool',
-            })),
-          }));
+              type: (d.type ?? 'tool') as DocumentType,
+            }));
+            // Invariant: exactly one main doc per project.
+            const mainCount = normalized.filter(d => d.type === 'main').length;
+            if (mainCount === 0) {
+              // Promote the active doc (or first) to main.
+              const fallbackId = p.activeDocumentId ?? normalized[0]?.id;
+              normalized.forEach(d => { if (d.id === fallbackId) d.type = 'main'; });
+            } else if (mainCount > 1) {
+              // Keep only the first main found.
+              let seen = false;
+              normalized.forEach(d => {
+                if (d.type === 'main') { if (seen) d.type = 'tool'; else seen = true; }
+              });
+            }
+            return { ...p, documents: normalized };
+          });
         }
 
         // ── Réhydratation des miroirs ────────────────────────────────────────
