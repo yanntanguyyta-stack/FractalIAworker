@@ -200,18 +200,13 @@ describe('ChatPane', () => {
     const input = screen.getByPlaceholderText(/Posez une question/i);
     fireEvent.change(input, { target: { value: 'Question test' } });
     
-    // Le bouton d'envoi est un bouton submit
-    const sendButton = screen.getByRole('button', { name: '' });
-    const buttons = screen.getAllByRole('button');
-    const submitButton = buttons.find(btn => btn.getAttribute('type') === 'submit');
-    
-    if (submitButton) {
-      fireEvent.click(submitButton);
-      
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalled();
-      }, { timeout: 3000 });
-    }
+    // Le bouton d'envoi est un bouton submit avec title="Envoyer"
+    const submitButton = screen.getByTitle('Envoyer');
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    }, { timeout: 3000 });
   });
 
   it('devrait afficher l\'indicateur de chargement pendant l\'appel API', async () => {

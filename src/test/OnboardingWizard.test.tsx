@@ -232,7 +232,7 @@ describe('OnboardingWizard', () => {
       );
       
       // Vérifier que la barre de progression existe
-      const progressBar = container.querySelector('.bg-gradient-to-r.from-blue-500.to-purple-500');
+      const progressBar = container.querySelector('.h-full.accent-gradient');
       expect(progressBar).toBeInTheDocument();
     });
 
@@ -240,8 +240,8 @@ describe('OnboardingWizard', () => {
       const { container } = render(
         <OnboardingWizard isOpen={true} onClose={mockOnClose} onOpenSettings={mockOnOpenSettings} />
       );
-      
-      const progressBar = container.querySelector('.bg-gradient-to-r.from-blue-500.to-purple-500');
+
+      const progressBar = container.querySelector('.h-full.accent-gradient');
       
       // À l'étape 1, la largeur devrait être 20%
       expect(progressBar).toHaveStyle({ width: '20%' });
@@ -285,7 +285,7 @@ describe('OnboardingWizard', () => {
         <OnboardingWizard isOpen={true} onClose={mockOnClose} onOpenSettings={mockOnOpenSettings} />
       );
       
-      const backdrop = container.querySelector('.backdrop-blur-sm');
+      const backdrop = container.querySelector('.modal-backdrop');
       expect(backdrop).toBeInTheDocument();
     });
 
@@ -293,8 +293,8 @@ describe('OnboardingWizard', () => {
       const { container } = render(
         <OnboardingWizard isOpen={true} onClose={mockOnClose} onOpenSettings={mockOnOpenSettings} />
       );
-      
-      const header = container.querySelector('.bg-gradient-to-r.from-blue-600');
+
+      const header = container.querySelector('.accent-gradient');
       expect(header).toBeInTheDocument();
     });
   });

@@ -140,46 +140,46 @@ Propose-moi un plan structuré pour ce document.`;
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="modal-backdrop">
+      <div className="glass-card w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-in">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-5">
+        <div className="px-6 py-4 flex items-center justify-between border-b border-white/40 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <FileText size={24} />
+            <div className="w-9 h-9 rounded-xl accent-gradient flex items-center justify-center shadow-glow-accent">
+              <FileText size={16} className="text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Créer un nouveau document</h2>
-              <p className="text-indigo-100 text-sm">L'IA va vous aider à structurer votre document</p>
+              <h2 className="text-lg font-bold accent-text-gradient tracking-tight">Créer un nouveau document</h2>
+              <p className="text-xs text-slate-500 mt-0.5">L'IA va vous aider à structurer votre document</p>
             </div>
           </div>
         </div>
 
         {/* Progress Steps */}
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+        <div className="px-6 py-3 border-b border-white/40 flex-shrink-0">
           <div className="flex items-center justify-between">
-            {['Décrire', 'Planifier', 'Créer'].map((label, idx) => (
-              <div key={label} className="flex items-center">
-                <div className={`flex items-center gap-2 ${
-                  idx === 0 && step === 'input' ? 'text-indigo-600' :
-                  idx === 1 && (step === 'loading' || step === 'review') ? 'text-indigo-600' :
-                  idx === 2 && step === 'creating' ? 'text-indigo-600' :
-                  'text-gray-400'
-                }`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                    idx === 0 && step === 'input' ? 'bg-indigo-600 text-white' :
-                    idx === 1 && (step === 'loading' || step === 'review') ? 'bg-indigo-600 text-white' :
-                    idx === 2 && step === 'creating' ? 'bg-indigo-600 text-white' :
-                    (step === 'review' && idx === 0) || (step === 'creating' && idx <= 1) ? 'bg-green-500 text-white' :
-                    'bg-gray-200 text-gray-500'
-                  }`}>
-                    {(step === 'review' && idx === 0) || (step === 'creating' && idx <= 1) ? <Check size={16} /> : idx + 1}
+            {['Décrire', 'Planifier', 'Créer'].map((label, idx) => {
+              const isActive =
+                (idx === 0 && step === 'input') ||
+                (idx === 1 && (step === 'loading' || step === 'review')) ||
+                (idx === 2 && step === 'creating');
+              const isDone = (step === 'review' && idx === 0) || (step === 'creating' && idx <= 1);
+              return (
+                <div key={label} className="flex items-center">
+                  <div className={`flex items-center gap-2 ${isActive ? 'text-accent-600' : isDone ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ease-spring ${
+                      isActive ? 'accent-gradient text-white shadow-glow-accent scale-110' :
+                      isDone ? 'bg-emerald-500 text-white' :
+                      'bg-white/60 text-slate-500 border border-white/60'
+                    }`}>
+                      {isDone ? <Check size={13} /> : idx + 1}
+                    </div>
+                    <span className="hidden sm:inline text-xs font-semibold">{label}</span>
                   </div>
-                  <span className="hidden sm:inline font-medium">{label}</span>
+                  {idx < 2 && <ChevronRight size={14} className="mx-3 text-slate-300" />}
                 </div>
-                {idx < 2 && <ChevronRight size={20} className="mx-4 text-gray-300" />}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -315,7 +315,7 @@ Propose-moi un plan structuré pour ce document.`;
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-between">
+        <div className="border-t border-white/40 px-6 py-4 flex justify-between flex-shrink-0">
           <button
             onClick={() => {
               if (step === 'review') {
@@ -324,38 +324,29 @@ Propose-moi un plan structuré pour ce document.`;
                 onClose();
               }
             }}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+            className="btn-ghost"
           >
             {step === 'review' ? 'Recommencer' : 'Annuler'}
           </button>
 
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {step === 'review' && (
-              <button
-                onClick={() => generatePlan(documentType)}
-                className="flex items-center gap-2 px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-              >
-                <RefreshCw size={18} />
+              <button onClick={() => generatePlan(documentType)} className="btn-secondary">
+                <RefreshCw size={15} />
                 Régénérer
               </button>
             )}
 
             {step === 'input' && documentType.trim() && (
-              <button
-                onClick={() => generatePlan(documentType)}
-                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium transition-colors"
-              >
-                <Sparkles size={18} />
+              <button onClick={() => generatePlan(documentType)} className="btn-primary">
+                <Sparkles size={15} />
                 Générer le plan
               </button>
             )}
 
             {step === 'review' && (
-              <button
-                onClick={createDocument}
-                className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg font-medium transition-colors"
-              >
-                <Check size={18} />
+              <button onClick={createDocument} className="btn bg-emerald-500 text-white shadow-soft hover:scale-[1.02]">
+                <Check size={15} />
                 Créer ce document
               </button>
             )}

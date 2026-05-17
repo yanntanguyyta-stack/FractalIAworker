@@ -43,8 +43,8 @@ beforeEach(() => {
 describe('App', () => {
   it('devrait rendre l\'application avec le titre', () => {
     render(<App />);
-    
-    expect(screen.getByText(/Node IA Worker/i)).toBeInTheDocument();
+
+    expect(screen.getByText(/FractalIA/i)).toBeInTheDocument();
   });
 
   it('devrait charger les données initiales au montage', async () => {
@@ -157,8 +157,8 @@ describe('App - Gestion des fichiers', () => {
     const exportButton = screen.getByText('Exporter');
     fireEvent.click(exportButton);
     
-    // Cliquer sur Export Markdown
-    const markdownExportButton = await screen.findByText('Export Markdown');
+    // Cliquer sur Markdown dans le dropdown export
+    const markdownExportButton = await screen.findByRole('button', { name: /^Markdown$/i });
     
     // Mock createElement pour capturer le téléchargement
     const mockClick = vi.fn();
@@ -317,10 +317,9 @@ describe('App - Intégration ChatPane', () => {
       expect(useStore.getState().tree.length).toBeGreaterThan(0);
     });
     
-    // Vérifier que le footer est présent
-    expect(screen.getByText(/nœuds racine chargés/)).toBeInTheDocument();
-    expect(screen.getByText(/Version 2.0/)).toBeInTheDocument();
-    expect(screen.getByText(/Local-First Architecture/)).toBeInTheDocument();
+    // Vérifier que le footer est présent (le footer contient "v2.0" et "Local-first")
+    expect(screen.getByText(/v2\.0 · Local-first/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sauvegarde auto/i)).toBeInTheDocument();
   });
 
   it('devrait afficher l\'input file hidden', () => {
@@ -374,11 +373,11 @@ describe('App - Intégration ChatPane', () => {
 
   it('devrait afficher tous les éléments du header', () => {
     render(<App />);
-    
-    // Vérifier les boutons du header
+
+    // Vérifier les boutons du header (Réinitialiser est désormais icon-only)
     expect(screen.getByText('Nouveau')).toBeInTheDocument();
     expect(screen.getByText('Importer')).toBeInTheDocument();
     expect(screen.getByText('Exporter')).toBeInTheDocument();
-    expect(screen.getByText('Réinitialiser')).toBeInTheDocument();
+    expect(screen.getByTitle('Réinitialiser')).toBeInTheDocument();
   });
 });
