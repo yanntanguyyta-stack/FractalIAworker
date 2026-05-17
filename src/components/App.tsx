@@ -11,7 +11,7 @@ import OnboardingWizard from './OnboardingWizard';
 import ImportWizard from './ImportWizard';
 import AdminDashboard from './AdminDashboard';
 import DocumentManager from './DocumentManager';
-import { Download, Upload, RefreshCw, Settings, FilePlus, GripVertical, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User, FolderOpen, Menu, X } from 'lucide-react';
+import { Download, Upload, RefreshCw, Settings, FilePlus, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User, FolderOpen, Menu, X } from 'lucide-react';
 import { buildHtmlDocument, buildPrintHtmlDocument, buildWordDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
 import { buildDocxBlob } from '../utils/docxExport';
 import {
@@ -375,9 +375,11 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     }
   };
 
+  const aiConfigured = !!aiConfig.apiKey;
+
   return (
     <div
-      className={`w-full h-screen bg-slate-100 flex flex-col relative ${className}`}
+      className={`w-full h-screen flex flex-col relative ${className}`}
       onDragEnter={handleDragEnter}
       onDragOver={(event) => event.preventDefault()}
       onDragLeave={handleDragLeave}
@@ -385,113 +387,86 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
     >
       {/* ===== MOBILE TOP BAR ===== */}
       {isMobile ? (
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 text-white flex-shrink-0">
+        <div className="glass-strong flex-shrink-0 sticky top-0 z-30">
           <div className="px-4 py-3 flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-bold">🧠 Node IA Worker</h1>
-              <p className="text-slate-200 text-xs">Local-First Markdown IA</p>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl accent-gradient flex items-center justify-center shadow-glow-accent">
+                <span className="text-white font-bold text-sm">F</span>
+              </div>
+              <div>
+                <h1 className="text-base font-bold accent-text-gradient tracking-tight">FractalIA</h1>
+                <p className="text-slate-500 text-[10px] -mt-0.5">Markdown · IA contextuelle</p>
+              </div>
             </div>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors"
+              className="icon-btn"
               aria-label="Menu"
             >
-              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
           </div>
           {mobileMenuOpen && (
-            <div className="px-4 pb-4 flex flex-col gap-2 max-h-[70vh] overflow-y-auto">
+            <div className="px-4 pb-4 pt-1 flex flex-col gap-1.5 max-h-[70vh] overflow-y-auto animate-fade-in-down">
               <button
                 onClick={() => { setDocManagerOpen(true); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors text-sm"
+                className="btn-secondary justify-start"
               >
                 <FolderOpen size={16} /> Mes documents
               </button>
               <button
                 onClick={() => { setNewDocWizardOpen(true); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-xl font-medium transition-colors text-sm"
+                className="btn-primary justify-start"
               >
-                <FilePlus size={16} /> Nouveau
+                <FilePlus size={16} /> Nouveau document
               </button>
               <button
                 onClick={() => { setImportWizardOpen(true); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors text-sm"
-                title="Importer un fichier avec analyse de structure"
+                className="btn-secondary justify-start"
               >
-                <Upload size={16} /> Importer
+                <Upload size={16} /> Importer un fichier
               </button>
-              <button
-                onClick={() => { handleExportMarkdown(); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
-              >
-                <FileText size={16} className="text-indigo-600" /> Export Markdown
+              <div className="divider my-1" />
+              <button onClick={() => { handleExportMarkdown(); setMobileMenuOpen(false); }} className="btn-ghost justify-start">
+                <FileText size={16} className="text-accent-600" /> Export Markdown
               </button>
-              <button
-                onClick={() => { handleExportHtml(); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
-              >
-                <FileCode size={16} className="text-blue-600" /> Export HTML
+              <button onClick={() => { handleExportHtml(); setMobileMenuOpen(false); }} className="btn-ghost justify-start">
+                <FileCode size={16} className="text-sky-600" /> Export HTML
               </button>
-              <button
-                onClick={() => { handleExportDocxNative(); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
-              >
-                <FileText size={16} className="text-emerald-700" /> Export Word (.docx)
+              <button onClick={() => { handleExportDocxNative(); setMobileMenuOpen(false); }} className="btn-ghost justify-start">
+                <FileText size={16} className="text-emerald-600" /> Export Word
               </button>
-              <button
-                onClick={() => { handleExportPdf(); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
-              >
-                <Printer size={16} className="text-rose-600" /> Export PDF
+              <button onClick={() => { handleExportPdf(); setMobileMenuOpen(false); }} className="btn-ghost justify-start">
+                <Printer size={16} className="text-rose-500" /> Export PDF
               </button>
-              <button
-                onClick={() => { handleShareLink(); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl text-sm"
-              >
-                <Share2 size={16} className="text-purple-600" /> Partager
+              <button onClick={() => { handleShareLink(); setMobileMenuOpen(false); }} className="btn-ghost justify-start">
+                <Share2 size={16} className="text-fuchsia-500" /> Partager le lien
               </button>
-              <button
-                onClick={() => { handleResetToDefault(); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl font-medium transition-colors text-sm"
-                title="Réinitialiser aux données par défaut"
-              >
-                <RefreshCw size={16} /> Réinitialiser
-              </button>
+              <div className="divider my-1" />
               <button
                 onClick={() => { setSettingsOpen(true); setMobileMenuOpen(false); }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors text-sm ${
-                  aiConfig.apiKey
-                    ? 'bg-green-500 hover:bg-green-600'
-                    : 'bg-orange-500 hover:bg-orange-600 animate-pulse'
-                }`}
-                title="Configuration IA"
+                className={aiConfigured ? 'btn-secondary justify-start' : 'btn-primary justify-start animate-glow-pulse'}
               >
-                <Settings size={16} /> {aiConfig.apiKey ? 'IA Configurée' : 'Configurer IA'}
+                <Settings size={16} /> {aiConfigured ? 'IA configurée' : 'Configurer l\'IA'}
               </button>
-              <button
-                onClick={() => { setOnboardingOpen(true); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors text-sm"
-              >
+              <button onClick={() => { setOnboardingOpen(true); setMobileMenuOpen(false); }} className="btn-ghost justify-start">
                 <HelpCircle size={16} /> Aide
+              </button>
+              <button onClick={() => { handleResetToDefault(); setMobileMenuOpen(false); }} className="btn-ghost justify-start">
+                <RefreshCw size={16} /> Réinitialiser
               </button>
               {currentUser && (
                 <>
+                  <div className="divider my-1" />
                   {currentUser.isAdmin && (
-                    <button
-                      onClick={() => { setAdminOpen(true); setMobileMenuOpen(false); }}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded-xl font-medium transition-colors text-sm"
-                    >
-                      <Shield size={16} /> Admin
+                    <button onClick={() => { setAdminOpen(true); setMobileMenuOpen(false); }} className="btn-secondary justify-start">
+                      <Shield size={16} className="text-amber-500" /> Admin
                     </button>
                   )}
-                  <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-xl text-sm">
-                    <User size={14} />
-                    <span className="truncate">{currentUser.name}</span>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/40 text-sm text-slate-600">
+                    <User size={14} /> <span className="truncate">{currentUser.name}</span>
                   </div>
-                  <button
-                    onClick={logout}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors text-sm"
-                  >
+                  <button onClick={logout} className="btn-ghost justify-start">
                     <LogOut size={16} /> Déconnexion
                   </button>
                 </>
@@ -501,230 +476,162 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
         </div>
       ) : (
         /* ===== DESKTOP TOP BAR ===== */
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-purple-900 text-white px-6 py-4 shadow-lg">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">🧠 Node IA Worker</h1>
-              <p className="text-slate-200 text-sm">
-                Local-First Markdown Collaboration avec IA Persona
-              </p>
+        <header className="glass-strong sticky top-0 z-30 flex-shrink-0">
+          <div className="px-5 py-2.5 flex items-center gap-3">
+            {/* Brand */}
+            <div className="flex items-center gap-2.5 mr-2">
+              <div className="w-9 h-9 rounded-xl accent-gradient flex items-center justify-center shadow-glow-accent">
+                <span className="text-white font-bold text-base tracking-tight">F</span>
+              </div>
+              <div className="leading-tight">
+                <h1 className="text-base font-bold accent-text-gradient tracking-tight">FractalIA</h1>
+                <p className="text-[10px] text-slate-500 -mt-0.5">Markdown hiérarchique · IA contextuelle</p>
+              </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="h-7 w-px bg-slate-200/80 mx-1" />
+
+            {/* Primary actions */}
+            <button onClick={() => setNewDocWizardOpen(true)} className="btn-primary" title="Créer un nouveau document">
+              <FilePlus size={15} /> Nouveau
+            </button>
+            <button onClick={() => setDocManagerOpen(true)} className="btn-secondary" title="Gérer mes documents">
+              <FolderOpen size={15} /> Documents
+            </button>
+            <button onClick={() => setImportWizardOpen(true)} className="btn-secondary" title="Importer un fichier">
+              <Upload size={15} /> Importer
+            </button>
+
+            {/* Export menu */}
+            <div className="relative">
               <button
-                onClick={() => setDocManagerOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
-                title="Gérer mes documents"
+                onClick={(event) => { event.stopPropagation(); setShowExportMenu((c) => !c); }}
+                className="btn-secondary"
+                title="Exporter ou partager"
               >
-                <FolderOpen size={18} />
-                Mes documents
+                <Download size={15} /> Exporter <ChevronDown size={13} className={`transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
               </button>
-
-              <button
-                onClick={() => setNewDocWizardOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-xl font-medium transition-colors shadow-sm"
-                title="Créer un nouveau document avec l'IA"
-              >
-                <FilePlus size={18} />
-                Nouveau
-              </button>
-
-              <button
-                onClick={() => setImportWizardOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
-                title="Importer un fichier avec analyse de structure"
-              >
-                <Upload size={18} />
-                Importer
-              </button>
-
-              <div className="relative">
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setShowExportMenu((current) => !current);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/90 text-slate-900 hover:bg-white rounded-xl font-medium transition-colors shadow-sm"
-                  title="Exporter ou partager"
-                >
-                  <Download size={18} />
-                  Exporter
-                  <ChevronDown size={14} />
-                </button>
-                {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-52 bg-white text-slate-900 rounded-lg shadow-xl border border-slate-200 z-20 overflow-hidden">
-                    <button
-                      onClick={() => {
-                        handleExportMarkdown();
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                    >
-                      <FileText size={16} className="text-indigo-600" />
-                      Export Markdown
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExportHtml();
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                    >
-                      <FileCode size={16} className="text-blue-600" />
-                      Export HTML
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExportDocx();
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                    >
-                      <FileText size={16} className="text-green-600" />
-                      Export Word (.doc)
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExportDocxNative();
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                    >
-                      <FileText size={16} className="text-emerald-700" />
-                      Export Word (.docx)
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleExportPdf();
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100"
-                    >
-                      <Printer size={16} className="text-rose-600" />
-                      Export PDF
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleShareLink();
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 border-t border-slate-200"
-                    >
-                      <Share2 size={16} className="text-purple-600" />
-                      Partager le lien
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={handleResetToDefault}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl font-medium transition-colors shadow-sm"
-                title="Réinitialiser aux données par défaut"
-              >
-                <RefreshCw size={18} />
-                Réinitialiser
-              </button>
-
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors shadow-sm ${
-                  aiConfig.apiKey 
-                    ? 'bg-green-500 hover:bg-green-600' 
-                    : 'bg-orange-500 hover:bg-orange-600 animate-pulse'
-                }`}
-                title="Configuration IA"
-              >
-                <Settings size={18} />
-                {aiConfig.apiKey ? 'IA Configurée' : 'Configurer IA'}
-              </button>
-
-              <button
-                onClick={() => setOnboardingOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors shadow-sm"
-                title="Aide et tutoriel"
-              >
-                <HelpCircle size={18} />
-                Aide
-              </button>
-
-              {currentUser && (
-                <>
-                  {currentUser.isAdmin && (
-                    <button
-                      onClick={() => setAdminOpen(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded-xl font-medium transition-colors shadow-sm"
-                      title="Tableau de bord admin"
-                    >
-                      <Shield size={18} />
-                      Admin
-                    </button>
-                  )}
-                  <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl text-sm">
-                    <User size={16} />
-                    <span className="max-w-24 truncate">{currentUser.name}</span>
-                  </div>
-                  <button
-                    onClick={logout}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors shadow-sm"
-                    title="Se déconnecter"
-                  >
-                    <LogOut size={18} />
-                    Déconnexion
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-56 glass-card p-1 z-40 origin-top-right animate-scale-in">
+                  <button onClick={() => { handleExportMarkdown(); setShowExportMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg hover:bg-white/60 text-slate-700 transition-colors">
+                    <FileText size={15} className="text-accent-600" /> Markdown
                   </button>
-                </>
+                  <button onClick={() => { handleExportHtml(); setShowExportMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg hover:bg-white/60 text-slate-700 transition-colors">
+                    <FileCode size={15} className="text-sky-600" /> HTML
+                  </button>
+                  <button onClick={() => { handleExportDocx(); setShowExportMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg hover:bg-white/60 text-slate-700 transition-colors">
+                    <FileText size={15} className="text-green-600" /> Word (.doc)
+                  </button>
+                  <button onClick={() => { handleExportDocxNative(); setShowExportMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg hover:bg-white/60 text-slate-700 transition-colors">
+                    <FileText size={15} className="text-emerald-600" /> Word (.docx)
+                  </button>
+                  <button onClick={() => { handleExportPdf(); setShowExportMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg hover:bg-white/60 text-slate-700 transition-colors">
+                    <Printer size={15} className="text-rose-500" /> PDF
+                  </button>
+                  <div className="my-1 mx-2 divider" />
+                  <button onClick={() => { handleShareLink(); setShowExportMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg hover:bg-white/60 text-slate-700 transition-colors">
+                    <Share2 size={15} className="text-fuchsia-500" /> Partager le lien
+                  </button>
+                </div>
               )}
             </div>
+
+            <div className="flex-1" />
+
+            {/* AI config indicator */}
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className={aiConfigured ? 'btn-secondary' : 'btn-primary animate-glow-pulse'}
+              title="Configuration IA"
+            >
+              <Settings size={15} />
+              {aiConfigured ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                  IA active
+                </span>
+              ) : 'Configurer IA'}
+            </button>
+
+            {/* Icon-only secondary actions */}
+            <button onClick={handleResetToDefault} className="icon-btn tooltip-wrapper" data-tooltip="Réinitialiser" title="Réinitialiser">
+              <RefreshCw size={16} />
+            </button>
+            <button onClick={() => setOnboardingOpen(true)} className="icon-btn tooltip-wrapper" data-tooltip="Aide & tutoriel" title="Aide">
+              <HelpCircle size={16} />
+            </button>
+
+            {currentUser && (
+              <>
+                <div className="h-7 w-px bg-slate-200/80 mx-1" />
+                {currentUser.isAdmin && (
+                  <button onClick={() => setAdminOpen(true)} className="icon-btn tooltip-wrapper text-amber-600 hover:text-amber-700" data-tooltip="Admin dashboard" title="Admin">
+                    <Shield size={16} />
+                  </button>
+                )}
+                <div className="flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-xl bg-white/50 border border-white/60">
+                  <div className="w-6 h-6 rounded-full accent-gradient flex items-center justify-center text-white text-[10px] font-bold">
+                    {currentUser.name?.charAt(0)?.toUpperCase() || 'U'}
+                  </div>
+                  <span className="text-xs font-medium text-slate-700 max-w-[100px] truncate">{currentUser.name}</span>
+                </div>
+                <button onClick={logout} className="icon-btn tooltip-wrapper" data-tooltip="Se déconnecter" title="Se déconnecter">
+                  <LogOut size={16} />
+                </button>
+              </>
+            )}
           </div>
-        </div>
+        </header>
       )}
 
       {/* ===== MOBILE: panneau unique ===== */}
       {isMobile ? (
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {activeMobilePanel === 'sidebar' && <Sidebar />}
-          {activeMobilePanel === 'editor' && <EditorPane />}
-          {activeMobilePanel === 'chat' && (
-            <ChatPane onOpenSettings={() => setSettingsOpen(true)} />
-          )}
+        <div className="flex-1 overflow-hidden flex flex-col p-2">
+          <div className="flex-1 glass-panel rounded-2xl overflow-hidden">
+            {activeMobilePanel === 'sidebar' && <Sidebar />}
+            {activeMobilePanel === 'editor' && <EditorPane />}
+            {activeMobilePanel === 'chat' && (
+              <ChatPane onOpenSettings={() => setSettingsOpen(true)} />
+            )}
+          </div>
         </div>
       ) : (
         /* ===== DESKTOP: 3 Colonnes Redimensionnables ===== */
-        <div ref={containerRef} className="flex-1 flex overflow-hidden">
+        <div ref={containerRef} className="flex-1 flex overflow-hidden p-3 gap-1.5">
           {/* Colonne Gauche - Sidebar (Navigation) */}
-          <div 
-            className="h-full bg-white overflow-hidden flex flex-col flex-shrink-0"
-            style={{ width: `${sidebarWidth}%` }}
+          <div
+            className="h-full glass-panel rounded-2xl overflow-hidden flex flex-col flex-shrink-0"
+            style={{ width: `calc(${sidebarWidth}% - 0.375rem)` }}
           >
             <Sidebar />
           </div>
 
-          {/* Séparateur 1 - Entre Sidebar et Éditeur */}
+          {/* Séparateur 1 */}
           <div
-            className="w-2 bg-gray-300 hover:bg-blue-500 active:bg-blue-600 cursor-col-resize flex-shrink-0 flex items-center justify-center transition-colors group"
+            className="w-1.5 cursor-col-resize flex-shrink-0 flex items-center justify-center group rounded-full transition-colors hover:bg-accent-200/40"
             onMouseDown={() => handleMouseDown('sidebar')}
           >
-            <GripVertical size={12} className="text-gray-500 group-hover:text-white" />
+            <div className="w-0.5 h-12 rounded-full bg-slate-300/0 group-hover:bg-accent-500/70 transition-colors" />
           </div>
 
           {/* Colonne Centrale - Éditeur */}
-          <div 
-            className="h-full bg-white overflow-hidden flex flex-col flex-shrink-0"
-            style={{ width: `${editorWidth}%` }}
+          <div
+            className="h-full glass-panel rounded-2xl overflow-hidden flex flex-col flex-shrink-0"
+            style={{ width: `calc(${editorWidth}% - 0.375rem)` }}
           >
             <EditorPane />
           </div>
 
-          {/* Séparateur 2 - Entre Éditeur et Chat */}
+          {/* Séparateur 2 */}
           <div
-            className="w-2 bg-gray-300 hover:bg-blue-500 active:bg-blue-600 cursor-col-resize flex-shrink-0 flex items-center justify-center transition-colors group"
+            className="w-1.5 cursor-col-resize flex-shrink-0 flex items-center justify-center group rounded-full transition-colors hover:bg-accent-200/40"
             onMouseDown={() => handleMouseDown('editor')}
           >
-            <GripVertical size={12} className="text-gray-500 group-hover:text-white" />
+            <div className="w-0.5 h-12 rounded-full bg-slate-300/0 group-hover:bg-accent-500/70 transition-colors" />
           </div>
 
-          {/* Colonne Droite - Chat IA (prend le reste) */}
-          <div className="h-full bg-white overflow-hidden flex flex-col flex-1">
+          {/* Colonne Droite - Chat IA */}
+          <div className="h-full glass-panel rounded-2xl overflow-hidden flex flex-col flex-1">
             <ChatPane onOpenSettings={() => setSettingsOpen(true)} />
           </div>
         </div>
@@ -740,10 +647,13 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       />
 
       {(isDragActive || isImporting) && (
-        <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center z-30 pointer-events-none">
-          <div className="bg-white rounded-xl px-6 py-4 text-center shadow-xl border border-slate-200">
+        <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none animate-fade-in" style={{ backgroundColor: 'rgba(15,23,42,0.35)', backdropFilter: 'blur(8px)' }}>
+          <div className="glass-card px-8 py-6 text-center animate-scale-in">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl accent-gradient flex items-center justify-center shadow-glow-accent-lg">
+              <Upload size={22} className="text-white" />
+            </div>
             <p className="text-sm font-semibold text-slate-800">
-              {isImporting ? 'Import en cours...' : 'Déposez votre fichier pour l’importer'}
+              {isImporting ? 'Import en cours…' : 'Déposez votre fichier ici'}
             </p>
             <p className="text-xs text-slate-500 mt-1">Markdown, PDF, DOCX et TXT acceptés</p>
           </div>
@@ -752,45 +662,39 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
       {/* ===== MOBILE: barre de navigation basse ===== */}
       {isMobile && (
-        <div className="flex-shrink-0 border-t border-gray-200 bg-white flex">
-          <button
-            onClick={() => setActiveMobilePanel('sidebar')}
-            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors ${
-              activeMobilePanel === 'sidebar' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <span className="text-base">📁</span>
-            Structure
-          </button>
-          <button
-            onClick={() => setActiveMobilePanel('editor')}
-            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors ${
-              activeMobilePanel === 'editor' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <span className="text-base">✏️</span>
-            Éditeur
-          </button>
-          <button
-            onClick={() => setActiveMobilePanel('chat')}
-            className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors ${
-              activeMobilePanel === 'chat' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <span className="text-base">🤖</span>
-            Chat IA
-          </button>
+        <div className="flex-shrink-0 p-2 pt-0">
+          <div className="glass-strong rounded-2xl flex p-1">
+            {[
+              { key: 'sidebar' as const, label: 'Structure', icon: <FolderOpen size={16} /> },
+              { key: 'editor' as const, label: 'Éditeur', icon: <FileText size={16} /> },
+              { key: 'chat' as const, label: 'Chat IA', icon: <span className="text-base leading-none">✦</span> },
+            ].map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setActiveMobilePanel(p.key)}
+                className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[11px] font-medium rounded-xl transition-all duration-200 ease-spring ${
+                  activeMobilePanel === p.key
+                    ? 'text-white accent-gradient shadow-glow-accent'
+                    : 'text-slate-600 hover:bg-white/40'
+                }`}
+              >
+                {p.icon}
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {/* ===== DESKTOP: Footer ===== */}
       {!isMobile && (
-        <div className="bg-gray-100 border-t border-gray-200 px-6 py-3 text-xs text-gray-600 flex items-center justify-between">
-          <span>
-            📁 {tree.length} nœuds racine chargés • Version 2.0 • Local-First Architecture
+        <div className="flex-shrink-0 px-6 py-2 text-[11px] text-slate-500 flex items-center justify-between border-t border-white/40 bg-white/30 backdrop-blur-md">
+          <span className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+            {tree.length} nœud{tree.length > 1 ? 's' : ''} racine · v2.0 · Local-first
           </span>
-          <span>
-            💾 Modification automatique • 🤖 Contexte Sandwich IA • 📝 Métadonnées HTML invisibles
+          <span className="text-slate-400">
+            Sauvegarde auto · Contexte sandwich IA · Métadonnées HTML
           </span>
         </div>
       )}
