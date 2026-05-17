@@ -172,54 +172,51 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+    <div className="modal-backdrop">
+      <div className="glass-card w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col animate-scale-in">
         {/* Header */}
-        <div className="bg-gradient-to-r from-slate-800 to-indigo-800 text-white px-6 py-5">
+        <div className="px-6 py-4 border-b border-white/40 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <FolderOpen size={24} />
+              <div className="w-9 h-9 rounded-xl accent-gradient flex items-center justify-center shadow-glow-accent">
+                <FolderOpen size={16} className="text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Mes documents</h2>
-                <p className="text-slate-300 text-sm">
+                <h2 className="text-lg font-bold accent-text-gradient tracking-tight">Mes documents</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
                   {filteredDocuments.length}/{docIndex.documents.length} document{docIndex.documents.length !== 1 ? 's' : ''}
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <X size={20} />
+            <button onClick={onClose} className="icon-btn" aria-label="Fermer">
+              <X size={16} />
             </button>
           </div>
           {/* Search bar */}
           <div className="mt-3 relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Rechercher par nom..."
-              className="w-full pl-8 pr-3 py-2 bg-white/15 border border-white/20 rounded-lg text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/40"
+              className="input pl-9"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+                className="absolute right-2 top-1/2 -translate-y-1/2 icon-btn-sm"
               >
-                <X size={14} />
+                <X size={12} />
               </button>
             )}
           </div>
           {/* Tag filters */}
           {allTags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2.5 flex flex-wrap gap-1">
               <button
                 onClick={() => setTagFilterId(null)}
-                className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tagFilterId === null ? 'bg-white text-indigo-800 font-semibold' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                className={`text-[11px] px-2 py-0.5 rounded-full font-medium transition-all duration-150 ${tagFilterId === null ? 'accent-gradient text-white shadow-glow-accent' : 'bg-white/60 text-slate-600 hover:bg-white/90 border border-white/60'}`}
               >
                 Tous
               </button>
@@ -227,7 +224,7 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
                 <button
                   key={tag}
                   onClick={() => setTagFilterId(tagFilterId === tag ? null : tag)}
-                  className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tagFilterId === tag ? 'bg-white text-indigo-800 font-semibold' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                  className={`text-[11px] px-2 py-0.5 rounded-full font-medium transition-all duration-150 ${tagFilterId === tag ? 'accent-gradient text-white shadow-glow-accent' : 'bg-white/60 text-slate-600 hover:bg-white/90 border border-white/60'}`}
                 >
                   #{tag}
                 </button>
@@ -239,41 +236,40 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
           {docIndex.documents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <FileText size={48} className="mb-4 opacity-50" />
-              <p className="text-lg font-medium text-gray-500">Aucun document</p>
-              <p className="text-sm text-gray-400 mb-6">Créez votre premier document pour commencer</p>
-              <button
-                onClick={() => { onClose(); onNewDocument(); }}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-medium transition-colors"
-              >
-                <FilePlus size={18} />
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-14 h-14 rounded-2xl accent-gradient-soft border border-accent-200/60 flex items-center justify-center mb-4">
+                <FileText size={22} className="text-accent-500" />
+              </div>
+              <p className="text-base font-semibold text-slate-700">Aucun document</p>
+              <p className="text-sm text-slate-500 mb-5">Créez votre premier document pour commencer</p>
+              <button onClick={() => { onClose(); onNewDocument(); }} className="btn-primary">
+                <FilePlus size={15} />
                 Créer un document
               </button>
             </div>
           ) : filteredDocuments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-              <Search size={36} className="mb-3 opacity-40" />
-              <p className="text-sm text-gray-500">Aucun document ne correspond à la recherche.</p>
+            <div className="flex flex-col items-center justify-center py-12">
+              <Search size={28} className="mb-3 text-slate-300" />
+              <p className="text-sm text-slate-500">Aucun document ne correspond à la recherche.</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {filteredDocuments
                 .sort((a, b) => b.updatedAt - a.updatedAt)
                 .map((doc) => (
                   <div
                     key={doc.id}
-                    className={`group relative p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    className={`group relative p-3 rounded-2xl border transition-all duration-200 ease-spring cursor-pointer ${
                       doc.id === activeDocId
-                        ? 'border-indigo-400 bg-indigo-50 shadow-sm'
-                        : 'border-gray-200 hover:border-indigo-200 hover:bg-gray-50'
+                        ? 'border-accent-300 accent-gradient-soft shadow-soft'
+                        : 'border-white/60 bg-white/40 hover:bg-white/70 hover:border-accent-200/50'
                     }`}
                     onClick={() => handleOpenDoc(doc.id)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className={`p-2 rounded-lg mt-0.5 ${
-                          doc.id === activeDocId ? 'bg-indigo-200 text-indigo-700' : 'bg-gray-100 text-gray-500'
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          doc.id === activeDocId ? 'accent-gradient text-white shadow-glow-accent' : 'bg-white/60 text-slate-500 border border-white/80'
                         }`}>
                           <FileText size={18} />
                         </div>
@@ -440,33 +436,28 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex flex-wrap items-center justify-between gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
-          >
+        <div className="border-t border-white/40 px-6 py-3 flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
+          <button onClick={onClose} className="btn-ghost">
             Fermer
           </button>
-          <div className="flex items-center gap-2">
-            {/* Export ZIP */}
+          <div className="flex items-center gap-1.5">
             <button
               onClick={handleExportZip}
               disabled={isExportingZip || docIndex.documents.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="btn-secondary"
               title="Exporter tous les documents en ZIP"
             >
-              <Download size={16} />
-              {isExportingZip ? 'Export...' : 'Export ZIP'}
+              <Download size={14} />
+              {isExportingZip ? 'Export…' : 'Export ZIP'}
             </button>
-            {/* Import ZIP */}
             <button
               onClick={() => zipInputRef.current?.click()}
               disabled={isImportingZip}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="btn-secondary"
               title="Importer des documents depuis un ZIP"
             >
-              <Upload size={16} />
-              {isImportingZip ? 'Import...' : 'Import ZIP'}
+              <Upload size={14} />
+              {isImportingZip ? 'Import…' : 'Import ZIP'}
             </button>
             <input
               ref={zipInputRef}
@@ -478,11 +469,8 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
                 if (file) handleImportZip(file);
               }}
             />
-            <button
-              onClick={() => { onClose(); onNewDocument(); }}
-              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg font-medium transition-colors"
-            >
-              <FilePlus size={18} />
+            <button onClick={() => { onClose(); onNewDocument(); }} className="btn-primary">
+              <FilePlus size={15} />
               Nouveau document
             </button>
           </div>

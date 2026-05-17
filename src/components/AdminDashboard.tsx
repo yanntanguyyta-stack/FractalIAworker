@@ -15,69 +15,60 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   if (!isOpen || !isAdmin) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="modal-backdrop">
+      <div className="glass-card w-full max-w-2xl mx-4 overflow-hidden max-h-[90vh] flex flex-col animate-scale-in">
         {/* Header */}
-        <div className="bg-gradient-to-r from-slate-800 to-indigo-900 text-white px-6 py-4 flex items-center justify-between">
+        <div className="px-6 py-4 flex items-center justify-between border-b border-white/40">
           <div className="flex items-center gap-3">
-            <Shield size={22} />
-            <h2 className="text-xl font-bold">Tableau de bord Admin</h2>
+            <div className="w-9 h-9 rounded-xl accent-gradient flex items-center justify-center shadow-glow-accent">
+              <Shield size={16} className="text-white" />
+            </div>
+            <h2 className="text-lg font-bold accent-text-gradient tracking-tight">Tableau de bord Admin</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            aria-label="Fermer"
-          >
-            <X size={20} />
+          <button onClick={onClose} className="icon-btn" aria-label="Fermer">
+            <X size={16} />
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-6 space-y-6">
-          {/* Info admin */}
-          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center gap-4">
-            <Users size={28} className="text-indigo-600" />
+        <div className="overflow-y-auto flex-1 p-6 space-y-4">
+          <div className="accent-gradient-soft border border-accent-200/50 rounded-2xl p-4 flex items-center gap-4">
+            <Users size={24} className="text-accent-600" />
             <div>
-              <p className="text-sm font-medium text-indigo-800">
+              <p className="text-sm font-semibold text-slate-800">
                 Connecté en tant qu'administrateur
               </p>
-              <p className="text-xs text-indigo-600">{user?.primaryEmailAddress?.emailAddress}</p>
+              <p className="text-xs text-slate-600 mt-0.5">{user?.primaryEmailAddress?.emailAddress}</p>
             </div>
           </div>
 
-          {/* Clerk Dashboard link */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-medium text-slate-700 mb-1">
-              👤 Gestion des utilisateurs
-            </p>
-            <p className="text-xs text-slate-500">
-              La gestion des utilisateurs (création, suppression, rôles, sessions actives) est
-              disponible dans le{' '}
+          <div className="glass border-white/60 rounded-2xl p-4 space-y-2">
+            <p className="text-sm font-semibold text-slate-800">Gestion des utilisateurs</p>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              La gestion des utilisateurs est disponible dans le{' '}
               <a
                 href="https://dashboard.clerk.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-indigo-600 hover:underline inline-flex items-center gap-1"
+                className="text-accent-600 hover:underline inline-flex items-center gap-1 font-medium"
               >
-                tableau de bord Clerk <ExternalLink size={12} />
+                tableau de bord Clerk <ExternalLink size={11} />
               </a>
               . Vous y trouverez la liste complète des utilisateurs, les statistiques
               d'authentification et les logs de sécurité.
             </p>
           </div>
 
-          {/* Analytics link */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <p className="text-sm font-medium text-slate-700 mb-1">📊 Analytiques Vercel</p>
-            <p className="text-xs text-slate-500">
-              Le suivi de trafic (pages vues, visiteurs uniques, géolocalisation) est disponible
-              dans votre{' '}
+          <div className="glass border-white/60 rounded-2xl p-4 space-y-2">
+            <p className="text-sm font-semibold text-slate-800">Analytiques Vercel</p>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Le suivi de trafic est disponible dans votre{' '}
               <a
                 href="https://vercel.com/analytics"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-indigo-600 hover:underline inline-flex items-center gap-1"
+                className="text-accent-600 hover:underline inline-flex items-center gap-1 font-medium"
               >
-                tableau de bord Vercel Analytics <ExternalLink size={12} />
+                tableau de bord Vercel Analytics <ExternalLink size={11} />
               </a>
               .
             </p>

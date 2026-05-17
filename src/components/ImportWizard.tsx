@@ -319,56 +319,60 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+    <div className="modal-backdrop">
+      <div className="glass-card w-full max-w-4xl max-h-[90vh] flex flex-col animate-scale-in overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/40 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Upload size={20} className="text-blue-600" />
+            <div className="w-9 h-9 rounded-xl accent-gradient flex items-center justify-center shadow-glow-accent">
+              <Upload size={16} className="text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Import de document</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-lg font-bold accent-text-gradient tracking-tight">Import de document</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
                 {step === 'upload' && 'Sélectionnez un fichier à importer'}
                 {step === 'preview' && 'Aperçu du contenu importé'}
-                {step === 'analyze' && 'Analyse de la structure en cours...'}
+                {step === 'analyze' && 'Analyse de la structure en cours…'}
                 {step === 'structure' && 'Validez la structure détectée'}
-                {step === 'import' && 'Import terminé !'}
+                {step === 'import' && 'Import terminé'}
               </p>
             </div>
           </div>
-          <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X size={20} className="text-gray-500" />
+          <button onClick={handleClose} className="icon-btn" aria-label="Fermer">
+            <X size={16} />
           </button>
         </div>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 border-b">
-          {(['upload', 'preview', 'structure', 'import'] as WizardStep[]).map((s, i) => (
-            <React.Fragment key={s}>
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                step === s ? 'bg-blue-500 text-white' :
-                (['upload', 'preview', 'structure', 'import'].indexOf(step) > i) ? 'bg-green-100 text-green-700' :
-                'bg-gray-200 text-gray-500'
-              }`}>
-                {(['upload', 'preview', 'structure', 'import'].indexOf(step) > i) ? (
-                  <CheckCircle size={14} />
-                ) : (
-                  <span className="w-5 h-5 flex items-center justify-center rounded-full bg-white/20 text-xs">
-                    {i + 1}
+        <div className="flex items-center justify-center gap-1.5 px-4 py-3 border-b border-white/40 flex-shrink-0">
+          {(['upload', 'preview', 'structure', 'import'] as WizardStep[]).map((s, i) => {
+            const isActive = step === s;
+            const isDone = ['upload', 'preview', 'structure', 'import'].indexOf(step) > i;
+            return (
+              <React.Fragment key={s}>
+                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all duration-200 ease-spring ${
+                  isActive ? 'accent-gradient text-white shadow-glow-accent' :
+                  isDone ? 'bg-emerald-100 text-emerald-700' :
+                  'bg-white/60 text-slate-500 border border-white/80'
+                }`}>
+                  {isDone ? (
+                    <CheckCircle size={12} />
+                  ) : (
+                    <span className="w-4 h-4 flex items-center justify-center rounded-full bg-white/30 text-[10px]">
+                      {i + 1}
+                    </span>
+                  )}
+                  <span className="hidden sm:inline">
+                    {s === 'upload' && 'Upload'}
+                    {s === 'preview' && 'Aperçu'}
+                    {s === 'structure' && 'Structure'}
+                    {s === 'import' && 'Import'}
                   </span>
-                )}
-                <span className="hidden sm:inline">
-                  {s === 'upload' && 'Upload'}
-                  {s === 'preview' && 'Aperçu'}
-                  {s === 'structure' && 'Structure'}
-                  {s === 'import' && 'Import'}
-                </span>
-              </div>
-              {i < 3 && <ChevronRight size={16} className="text-gray-400" />}
-            </React.Fragment>
-          ))}
+                </div>
+                {i < 3 && <ChevronRight size={12} className="text-slate-300" />}
+              </React.Fragment>
+            );
+          })}
         </div>
 
         {/* Content */}
@@ -602,29 +606,26 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
 
         {/* Footer */}
         {step !== 'import' && step !== 'analyze' && (
-          <div className="flex items-center justify-between p-4 border-t bg-gray-50 rounded-b-xl">
+          <div className="flex items-center justify-between px-6 py-3 border-t border-white/40 flex-shrink-0">
             <button
               onClick={step === 'upload' ? handleClose : () => setStep(step === 'structure' ? 'preview' : 'upload')}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+              className="btn-ghost"
             >
               {step === 'upload' ? 'Annuler' : '← Retour'}
             </button>
 
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               {step === 'preview' && (
                 <>
-                  <button
-                    onClick={handleImportRaw}
-                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
-                  >
+                  <button onClick={handleImportRaw} className="btn-secondary">
                     Importer tel quel
                   </button>
                   <button
                     onClick={analyzeStructure}
                     disabled={isLoading || !aiConfig.apiKey}
-                    className="flex items-center gap-2 px-6 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                    className="btn-primary"
                   >
-                    <Wand2 size={18} />
+                    <Wand2 size={15} />
                     Analyser la structure
                   </button>
                 </>
@@ -634,9 +635,9 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
                 <button
                   onClick={handleImport}
                   disabled={isLoading}
-                  className="flex items-center gap-2 px-6 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                  className="btn bg-emerald-500 text-white shadow-soft hover:scale-[1.02]"
                 >
-                  <CheckCircle size={18} />
+                  <CheckCircle size={15} />
                   Importer avec cette structure
                 </button>
               )}

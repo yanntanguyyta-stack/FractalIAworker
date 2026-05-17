@@ -33,8 +33,8 @@ describe('Root', () => {
     expect(screen.getByText('Commencer gratuitement')).toBeInTheDocument();
   });
 
-  it('devrait afficher le titre Node IA Worker', () => {
+  it('devrait afficher le titre FractalIA', () => {
     render(<Root />);
-    expect(screen.getAllByText(/Node IA Worker/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/FractalIA/i).length).toBeGreaterThan(0);
   });
 });

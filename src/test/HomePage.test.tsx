@@ -5,7 +5,7 @@ import HomePage from '../components/HomePage';
 describe('HomePage', () => {
   it('devrait afficher le titre principal', () => {
     render(<HomePage onLogin={vi.fn()} onRegister={vi.fn()} />);
-    expect(screen.getByText('Node IA Worker')).toBeInTheDocument();
+    expect(screen.getByText('FractalIA')).toBeInTheDocument();
   });
 
   it('devrait afficher les boutons Se connecter et Créer un compte', () => {
@@ -43,11 +43,11 @@ describe('HomePage', () => {
     expect(screen.getByText('Markdown natif')).toBeInTheDocument();
     expect(screen.getByText('Import intelligent')).toBeInTheDocument();
     expect(screen.getByText('Votre clé API')).toBeInTheDocument();
-    expect(screen.getByText('Local-First')).toBeInTheDocument();
+    expect(screen.getByText('Local-first')).toBeInTheDocument();
   });
 
   it('devrait afficher le footer', () => {
     render(<HomePage onLogin={vi.fn()} onRegister={vi.fn()} />);
-    expect(screen.getByText(/Local-First Architecture/)).toBeInTheDocument();
+    expect(screen.getByText(/Architecture local-first/i)).toBeInTheDocument();
   });
 });

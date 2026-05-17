@@ -240,98 +240,88 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onClose, on
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+    <div className="modal-backdrop">
+      <div className="glass-card w-full max-w-2xl overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+        <div className="px-6 py-4 flex items-center justify-between border-b border-white/40 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="bg-white/20 rounded-xl p-2">
-              <Icon size={24} className="text-white" />
+            <div className="w-10 h-10 rounded-xl accent-gradient flex items-center justify-center shadow-glow-accent">
+              <Icon size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">{step.title}</h2>
-              <p className="text-blue-100 text-sm">
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">{step.title}</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Étape {currentStep + 1} sur {steps.length}
               </p>
             </div>
           </div>
           <button
             onClick={handleSkip}
-            className="text-white/70 hover:text-white hover:bg-white/10 rounded-lg p-2 transition-colors"
+            className="icon-btn"
             title="Passer l'introduction"
+            aria-label="Passer l'introduction"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
         {/* Progress bar */}
-        <div className="h-1 bg-gray-100">
-          <div 
-            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
+        <div className="h-1 bg-slate-100/60 flex-shrink-0">
+          <div
+            className="h-full accent-gradient transition-all duration-500 ease-spring"
             style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
           />
         </div>
 
         {/* Content */}
-        <div className="p-6 min-h-[320px]">
+        <div className="p-6 overflow-y-auto min-h-[280px]">
           {step.content}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-100 px-6 py-4 flex items-center justify-between bg-gray-50">
-          <div className="flex items-center gap-2">
-            {/* Step dots */}
-            <div className="flex gap-1.5">
-              {steps.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentStep(index)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    index === currentStep 
-                      ? 'bg-blue-600 w-6' 
-                      : index < currentStep 
-                        ? 'bg-blue-300' 
-                        : 'bg-gray-300'
-                  }`}
-                />
-              ))}
-            </div>
+        <div className="border-t border-white/40 px-6 py-4 flex items-center justify-between flex-shrink-0">
+          <div className="flex gap-1.5">
+            {steps.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentStep(index)}
+                className={`h-1.5 rounded-full transition-all duration-300 ease-spring ${
+                  index === currentStep
+                    ? 'w-6 accent-gradient shadow-glow-accent'
+                    : index < currentStep
+                      ? 'w-1.5 bg-accent-300'
+                      : 'w-1.5 bg-slate-200'
+                }`}
+                aria-label={`Étape ${index + 1}`}
+              />
+            ))}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {!isFirstStep && (
-              <button
-                onClick={handlePrevious}
-                className="flex items-center gap-1 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ChevronLeft size={18} />
+              <button onClick={handlePrevious} className="btn-ghost">
+                <ChevronLeft size={15} />
                 Précédent
               </button>
             )}
-            
+
             {step.id === 'api-key' && (
-              <button
-                onClick={handleConfigureAPI}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors font-medium"
-              >
-                <Key size={18} />
+              <button onClick={handleConfigureAPI} className="btn bg-emerald-500 text-white shadow-soft hover:scale-[1.02]">
+                <Key size={15} />
                 Configurer ma clé API
               </button>
             )}
-            
-            <button
-              onClick={handleNext}
-              className="flex items-center gap-1 px-5 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors font-medium"
-            >
+
+            <button onClick={handleNext} className="btn-primary">
               {isLastStep ? (
                 <>
                   Commencer
-                  <Rocket size={18} />
+                  <Rocket size={15} />
                 </>
               ) : (
                 <>
                   Suivant
-                  <ChevronRight size={18} />
+                  <ChevronRight size={15} />
                 </>
               )}
             </button>
