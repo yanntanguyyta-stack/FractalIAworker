@@ -32,7 +32,7 @@ const SUPPORTED_FORMATS = [
 ];
 
 const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
-  const { loadMarkdown, aiConfig } = useStore();
+  const { loadMarkdown, importAsDocument, aiConfig } = useStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<WizardStep>('upload');
@@ -44,7 +44,7 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
   const [analysisProgress, setAnalysisProgress] = useState<string>('');
   const [detectedStructure, setDetectedStructure] = useState<DetectedSection[]>([]);
   const [analysisPrompt, setAnalysisPrompt] = useState<string>('');
-  const [importMode, setImportMode] = useState<'replace' | 'append'>('replace');
+  const [importMode, setImportMode] = useState<'replace' | 'append' | 'new-doc'>('replace');
 
   const resetWizard = useCallback(() => {
     setStep('upload');
@@ -227,9 +227,12 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
 
       if (importMode === 'replace') {
         loadMarkdown(markdown);
-      } else {
+      } else if (importMode === 'append') {
         const currentMarkdown = useStore.getState().saveToMarkdown();
         loadMarkdown(currentMarkdown + '\n\n' + markdown);
+      } else {
+        const docName = file?.name.replace(/\.[^.]+$/, '') || 'Document importé';
+        importAsDocument(docName, markdown);
       }
 
       setStep('import');
@@ -246,9 +249,12 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
     const markdown = `# ${file?.name.replace(/\.[^.]+$/, '') || 'Document importé'}\n\n${rawContent}`;
     if (importMode === 'replace') {
       loadMarkdown(markdown);
-    } else {
+    } else if (importMode === 'append') {
       const currentMarkdown = useStore.getState().saveToMarkdown();
       loadMarkdown(currentMarkdown + '\n\n' + markdown);
+    } else {
+      const docName = file?.name.replace(/\.[^.]+$/, '') || 'Document importé';
+      importAsDocument(docName, markdown);
     }
     setStep('import');
     setTimeout(() => handleClose(), 1500);
@@ -516,6 +522,15 @@ const ImportWizard: React.FC<ImportWizardProps> = ({ isOpen, onClose }) => {
                       className="text-indigo-600"
                     />
                     <span className="text-sm text-indigo-700">Ajouter au document</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={importMode === 'new-doc'}
+                      onChange={() => setImportMode('new-doc')}
+                      className="text-indigo-600"
+                    />
+                    <span className="text-sm text-indigo-700">Nouveau document dans le projet</span>
                   </label>
                 </div>
               </div>

@@ -33,13 +33,27 @@ interface HistorySnapshot {
   activeNodeId: string | null;
 }
 
+// Un document dans le projet (chaque onglet)
+export interface ProjectDocument {
+  id: string;
+  name: string;
+  tree: NodeData[];
+  markdown: string;
+  history: HistorySnapshot[];
+  future: HistorySnapshot[];
+}
+
 const MAX_HISTORY_SIZE = 50;
 
 // ID spécial pour le nœud H0 (document global)
 export const DOCUMENT_ROOT_ID = '__document_root__';
 
 interface EditorState {
-  // Données
+  // Projet multi-documents
+  documents: ProjectDocument[];
+  activeDocumentId: string;
+
+  // Données du document actif (miroir de documents[activeDocumentId])
   tree: NodeData[];
   activeNodeId: string | null;  // null ou DOCUMENT_ROOT_ID = vue document complet
   selectedNodeIds: Set<string>;  // sélection multiple pour opérations groupées
@@ -68,7 +82,8 @@ interface EditorState {
   updateNodeContent: (nodeId: string, content: string) => void;
   updateNodeHeading: (nodeId: string, heading: string) => void;  // Renommer un nœud
   updateNodeMeta: (nodeId: string, updates: Partial<NodeData['meta']>) => void;
-  addChild: (parentId: string, heading: string) => void;
+  addChild: (parentId: string, heading: string, content?: string) => void;
+  insertSectionsAsChildren: (parentId: string, sections: { heading: string; content: string }[]) => void;
   deleteNode: (nodeId: string) => void;
   copyNode: (nodeId: string) => void;
   pasteNode: (targetId?: string | null) => boolean;
@@ -105,6 +120,13 @@ interface EditorState {
   setAIConfig: (config: AIConfig) => void;
   setChatMode: (mode: ChatMode) => void;
   setPendingAIPrompt: (prompt: string | null) => void;
+
+  // Actions Multi-documents
+  createDocument: (name: string) => void;
+  switchDocument: (id: string) => void;
+  renameDocument: (id: string, name: string) => void;
+  deleteDocument: (id: string) => void;
+  importAsDocument: (name: string, markdown: string) => void;
 
   // Actions Évaluation
   setAssessmentConfig: (config: AssessmentConfig) => void;
@@ -351,7 +373,11 @@ function applyDepthDelta(
 
 export const useStore = create<EditorState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      const defaultDocId = generateId();
+      return ({
+      documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [] }],
+      activeDocumentId: defaultDocId,
       tree: [],
       activeNodeId: null,
       selectedNodeIds: new Set<string>(),
@@ -515,13 +541,16 @@ export const useStore = create<EditorState>()(
 
   clearRecentlyMoved: () => set({ recentlyMovedNodeId: null }),
 
-  // Charger le Markdown et parser l'arbre
+  // Charger le Markdown dans le document actif
   loadMarkdown: (markdown: string) => {
     const parsedTree = parseMarkdownToTree(markdown);
-    const { assessmentConfig } = get();
+    const { assessmentConfig, documents, activeDocumentId } = get();
     const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsedTree) : parsedTree;
-    // Par défaut, sélectionner le document complet (H0)
+    const updatedDocs = documents.map(d =>
+      d.id === activeDocumentId ? { ...d, tree, markdown, history: [], future: [] } : d
+    );
     set({
+      documents: updatedDocs,
       tree, markdown, activeNodeId: DOCUMENT_ROOT_ID,
       history: [], future: [],
       selectedNodeIds: new Set(), lastSelectedNodeId: null, recentlyMovedNodeId: null,
@@ -530,7 +559,12 @@ export const useStore = create<EditorState>()(
 
   // Charger un arbre directement (restauration depuis le stockage utilisateur)
   loadTree: (tree: NodeData[]) => {
+    const { documents, activeDocumentId } = get();
+    const updatedDocs = documents.map(d =>
+      d.id === activeDocumentId ? { ...d, tree, history: [], future: [] } : d
+    );
     set({
+      documents: updatedDocs,
       tree, activeNodeId: DOCUMENT_ROOT_ID,
       history: [], future: [],
       selectedNodeIds: new Set(), lastSelectedNodeId: null, recentlyMovedNodeId: null,
@@ -627,10 +661,10 @@ export const useStore = create<EditorState>()(
   },
 
   // Ajouter un enfant à un nœud (ou un nœud racine H1 si parentId === DOCUMENT_ROOT_ID)
-  addChild: (parentId: string, heading: string) => {
+  addChild: (parentId: string, heading: string, content: string = '') => {
     const { tree } = get();
     const { assessmentConfig } = get();
-    
+
     // Cas spécial : ajouter un nœud racine (H1)
     if (parentId === DOCUMENT_ROOT_ID) {
       (get() as any)._pushHistory();
@@ -638,7 +672,7 @@ export const useStore = create<EditorState>()(
         id: generateId(),
         heading,
         headingDepth: 1,
-        content: '',
+        content,
         meta: {
           id: generateId(),
           type: 'section',
@@ -649,7 +683,7 @@ export const useStore = create<EditorState>()(
       set({ tree: [...tree, newNode] });
       return;
     }
-    
+
     const parent = findNodeById(tree, parentId);
     if (parent) {
       (get() as any)._pushHistory();
@@ -657,7 +691,7 @@ export const useStore = create<EditorState>()(
         id: generateId(),
         heading,
         headingDepth: parent.headingDepth + 1,
-        content: '',
+        content,
         meta: {
           id: generateId(),
           type: 'section',
@@ -670,6 +704,43 @@ export const useStore = create<EditorState>()(
       });
       set({ tree: updated });
     }
+  },
+
+  // Insérer plusieurs sections comme enfants en une seule opération (un seul undo)
+  insertSectionsAsChildren: (parentId: string, sections: { heading: string; content: string }[]) => {
+    if (sections.length === 0) return;
+    const { tree, assessmentConfig } = get();
+
+    const childDepth = parentId === DOCUMENT_ROOT_ID
+      ? 1
+      : (() => { const p = findNodeById(tree, parentId); return p ? p.headingDepth + 1 : 1; })();
+
+    (get() as any)._pushHistory();
+
+    const newChildren: NodeData[] = sections.map(s => ({
+      id: generateId(),
+      heading: s.heading,
+      headingDepth: childDepth,
+      content: s.content,
+      meta: {
+        id: generateId(),
+        type: 'section' as const,
+        evaluation: assessmentConfig.enabled ? { ...defaultEvaluation } : undefined,
+      },
+      children: [],
+    }));
+
+    if (parentId === DOCUMENT_ROOT_ID) {
+      set({ tree: [...tree, ...newChildren] });
+      return;
+    }
+
+    const parent = findNodeById(tree, parentId);
+    if (!parent) return;
+    const updated = updateNodeInTree(tree, parentId, {
+      children: [...parent.children, ...newChildren],
+    });
+    set({ tree: updated });
   },
 
   // Supprimer un nœud
@@ -803,6 +874,121 @@ export const useStore = create<EditorState>()(
     set({ pendingAIPrompt: prompt });
   },
 
+  // ── Multi-documents ──────────────────────────────────────────────────────
+
+  // Sauvegarde l'état courant dans le tableau documents (appelé avant tout switch)
+  _saveCurrentDocSnapshot: () => {
+    const { documents, activeDocumentId, tree, markdown, history, future } = get();
+    const updated = documents.map(d =>
+      d.id === activeDocumentId ? { ...d, tree, markdown, history, future } : d
+    );
+    set({ documents: updated });
+  },
+
+  createDocument: (name: string) => {
+    (get() as any)._saveCurrentDocSnapshot();
+    const newDoc: ProjectDocument = {
+      id: generateId(),
+      name,
+      tree: [],
+      markdown: '',
+      history: [],
+      future: [],
+    };
+    const { documents } = get();
+    set({
+      documents: [...documents, newDoc],
+      activeDocumentId: newDoc.id,
+      tree: [],
+      markdown: '',
+      history: [],
+      future: [],
+      activeNodeId: DOCUMENT_ROOT_ID,
+      selectedNodeIds: new Set(),
+      lastSelectedNodeId: null,
+      recentlyMovedNodeId: null,
+    });
+  },
+
+  switchDocument: (id: string) => {
+    const { activeDocumentId } = get();
+    if (id === activeDocumentId) return;
+    (get() as any)._saveCurrentDocSnapshot();
+    const { documents } = get();
+    const target = documents.find(d => d.id === id);
+    if (!target) return;
+    set({
+      activeDocumentId: id,
+      tree: target.tree,
+      markdown: target.markdown,
+      history: target.history,
+      future: target.future,
+      activeNodeId: DOCUMENT_ROOT_ID,
+      selectedNodeIds: new Set(),
+      lastSelectedNodeId: null,
+      recentlyMovedNodeId: null,
+    });
+  },
+
+  renameDocument: (id: string, name: string) => {
+    (get() as any)._saveCurrentDocSnapshot();
+    const { documents } = get();
+    set({ documents: documents.map(d => d.id === id ? { ...d, name } : d) });
+  },
+
+  deleteDocument: (id: string) => {
+    const { documents, activeDocumentId } = get();
+    if (documents.length <= 1) return; // garder au moins 1 document
+    (get() as any)._saveCurrentDocSnapshot();
+    const remaining = documents.filter(d => d.id !== id);
+    if (id !== activeDocumentId) {
+      set({ documents: remaining });
+      return;
+    }
+    // Switcher vers le document précédent ou premier restant
+    const deletedIndex = documents.findIndex(d => d.id === id);
+    const nextDoc = remaining[Math.max(0, deletedIndex - 1)];
+    set({
+      documents: remaining,
+      activeDocumentId: nextDoc.id,
+      tree: nextDoc.tree,
+      markdown: nextDoc.markdown,
+      history: nextDoc.history,
+      future: nextDoc.future,
+      activeNodeId: DOCUMENT_ROOT_ID,
+      selectedNodeIds: new Set(),
+      lastSelectedNodeId: null,
+      recentlyMovedNodeId: null,
+    });
+  },
+
+  importAsDocument: (name: string, markdown: string) => {
+    (get() as any)._saveCurrentDocSnapshot();
+    const { assessmentConfig, documents } = get();
+    const parsed = parseMarkdownToTree(markdown);
+    const tree = assessmentConfig.enabled ? ensureAssessmentMeta(parsed) : parsed;
+    const newDoc: ProjectDocument = {
+      id: generateId(),
+      name,
+      tree,
+      markdown,
+      history: [],
+      future: [],
+    };
+    set({
+      documents: [...documents, newDoc],
+      activeDocumentId: newDoc.id,
+      tree,
+      markdown,
+      history: [],
+      future: [],
+      activeNodeId: DOCUMENT_ROOT_ID,
+      selectedNodeIds: new Set(),
+      lastSelectedNodeId: null,
+      recentlyMovedNodeId: null,
+    });
+  },
+
   setAssessmentConfig: (config: AssessmentConfig) => {
     const { assessmentConfig, tree } = get();
     if (!assessmentConfig.enabled && config.enabled) {
@@ -908,10 +1094,27 @@ export const useStore = create<EditorState>()(
     const updatedTree = calculateScores(tree);
     set({ tree: updatedTree });
   },
-    }),
+    });},
     {
       name: 'irlm-ai-config',
-      partialize: (state) => ({ aiConfig: state.aiConfig, assessmentConfig: state.assessmentConfig }),
+      partialize: (state) => ({
+        aiConfig: state.aiConfig,
+        assessmentConfig: state.assessmentConfig,
+        documents: state.documents,
+        activeDocumentId: state.activeDocumentId,
+      }),
+      // After rehydration, hydrate the top-level mirror fields from the
+      // active document so the editor doesn't render an empty tree.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const activeDoc = state.documents?.find((d: ProjectDocument) => d.id === state.activeDocumentId);
+        if (activeDoc) {
+          state.tree = activeDoc.tree;
+          state.markdown = activeDoc.markdown;
+          state.history = activeDoc.history;
+          state.future = activeDoc.future;
+        }
+      },
     }
   )
 );

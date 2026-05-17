@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../store';
 
 beforeEach(() => {
+  const defaultDocId = 'test-doc';
   useStore.setState({
+    documents: [{ id: defaultDocId, name: 'Document', tree: [], markdown: '', history: [], future: [] }],
+    activeDocumentId: defaultDocId,
     tree: [],
     activeNodeId: null,
     selectedNodeIds: new Set(),

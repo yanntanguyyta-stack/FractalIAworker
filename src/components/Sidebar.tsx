@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-  ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste,
+  ChevronDown, ChevronRight, Plus, FilePlus, Trash2, FolderTree, Copy, ClipboardPaste,
   GripVertical, Search, Undo2, Redo2, FileText, Pencil, X,
   ChevronUp as LevelUp, ChevronDown as LevelDown, Sparkles,
 } from 'lucide-react';
-import { useStore, DOCUMENT_ROOT_ID } from '../store';
+import { useStore, DOCUMENT_ROOT_ID, ProjectDocument } from '../store';
 import { NodeData } from '../types';
 import {
   countAllNodes,
@@ -55,9 +55,25 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     selectedNodeIds, toggleNodeSelection, selectRangeTo, clearSelection,
     recentlyMovedNodeId, clearRecentlyMoved, promoteNodes, demoteNodes,
     deleteNodes,
+    documents, activeDocumentId, createDocument, switchDocument, renameDocument, deleteDocument,
   } = useStore();
   const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+  const [renamingDocId, setRenamingDocId] = React.useState<string | null>(null);
+  const [renameValue, setRenameValue] = React.useState('');
+  const renameInputRef = React.useRef<HTMLInputElement>(null);
+
+  const startRename = (id: string, name: string) => {
+    setRenamingDocId(id);
+    setRenameValue(name);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  };
+  const commitRename = (id: string) => {
+    const trimmed = renameValue.trim();
+    if (trimmed) renameDocument(id, trimmed);
+    setRenamingDocId(null);
+  };
+  const cancelRename = () => setRenamingDocId(null);
 
   const {
     searchTerm, setSearchTerm, trimmedSearch, searchResults,
@@ -435,6 +451,59 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
+      {/* ── Onglets Documents ─────────────────────────────────────────── */}
+      <div className="flex items-center gap-0.5 px-2 pt-2 pb-1.5 border-b border-white/40 overflow-x-auto flex-shrink-0 min-w-0">
+        {documents.map((doc: ProjectDocument) => (
+          <div
+            key={doc.id}
+            className={`group relative flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-all whitespace-nowrap flex-shrink-0 max-w-[140px] ${
+              doc.id === activeDocumentId
+                ? 'bg-white/90 text-slate-900 shadow-soft border border-white/80'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+            }`}
+            onClick={() => doc.id !== activeDocumentId && switchDocument(doc.id)}
+            onDoubleClick={() => startRename(doc.id, doc.name)}
+            title={doc.name}
+          >
+            {renamingDocId === doc.id ? (
+              <input
+                ref={renameInputRef}
+                className="w-20 text-xs bg-transparent border-b border-accent-400 outline-none text-slate-900"
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onBlur={() => commitRename(doc.id)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') commitRename(doc.id);
+                  if (e.key === 'Escape') cancelRename();
+                }}
+                onClick={e => e.stopPropagation()}
+              />
+            ) : (
+              <span className="truncate max-w-[100px]">{doc.name}</span>
+            )}
+            {documents.length > 1 && (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  if (confirm(`Supprimer le document "${doc.name}" ?`)) deleteDocument(doc.id);
+                }}
+                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-red-500 transition-all flex-shrink-0 ml-0.5"
+                title="Supprimer ce document"
+              >
+                <X size={10} />
+              </button>
+            )}
+          </div>
+        ))}
+        <button
+          onClick={() => createDocument('Nouveau document')}
+          className="flex-shrink-0 p-1 rounded-lg text-slate-400 hover:text-accent-600 hover:bg-white/50 transition-colors ml-0.5"
+          title="Ajouter un document"
+        >
+          <FilePlus size={13} />
+        </button>
+      </div>
+
       <div className="px-3 pt-3 pb-2 flex-shrink-0 border-b border-white/40">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
