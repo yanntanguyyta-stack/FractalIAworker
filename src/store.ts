@@ -1103,6 +1103,18 @@ export const useStore = create<EditorState>()(
         documents: state.documents,
         activeDocumentId: state.activeDocumentId,
       }),
+      // After rehydration, hydrate the top-level mirror fields from the
+      // active document so the editor doesn't render an empty tree.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const activeDoc = state.documents?.find((d: ProjectDocument) => d.id === state.activeDocumentId);
+        if (activeDoc) {
+          state.tree = activeDoc.tree;
+          state.markdown = activeDoc.markdown;
+          state.history = activeDoc.history;
+          state.future = activeDoc.future;
+        }
+      },
     }
   )
 );
