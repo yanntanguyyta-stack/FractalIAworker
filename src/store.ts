@@ -68,7 +68,8 @@ interface EditorState {
   updateNodeContent: (nodeId: string, content: string) => void;
   updateNodeHeading: (nodeId: string, heading: string) => void;  // Renommer un nœud
   updateNodeMeta: (nodeId: string, updates: Partial<NodeData['meta']>) => void;
-  addChild: (parentId: string, heading: string) => void;
+  addChild: (parentId: string, heading: string, content?: string) => void;
+  insertSectionsAsChildren: (parentId: string, sections: { heading: string; content: string }[]) => void;
   deleteNode: (nodeId: string) => void;
   copyNode: (nodeId: string) => void;
   pasteNode: (targetId?: string | null) => boolean;
@@ -627,10 +628,10 @@ export const useStore = create<EditorState>()(
   },
 
   // Ajouter un enfant à un nœud (ou un nœud racine H1 si parentId === DOCUMENT_ROOT_ID)
-  addChild: (parentId: string, heading: string) => {
+  addChild: (parentId: string, heading: string, content: string = '') => {
     const { tree } = get();
     const { assessmentConfig } = get();
-    
+
     // Cas spécial : ajouter un nœud racine (H1)
     if (parentId === DOCUMENT_ROOT_ID) {
       (get() as any)._pushHistory();
@@ -638,7 +639,7 @@ export const useStore = create<EditorState>()(
         id: generateId(),
         heading,
         headingDepth: 1,
-        content: '',
+        content,
         meta: {
           id: generateId(),
           type: 'section',
@@ -649,7 +650,7 @@ export const useStore = create<EditorState>()(
       set({ tree: [...tree, newNode] });
       return;
     }
-    
+
     const parent = findNodeById(tree, parentId);
     if (parent) {
       (get() as any)._pushHistory();
@@ -657,7 +658,7 @@ export const useStore = create<EditorState>()(
         id: generateId(),
         heading,
         headingDepth: parent.headingDepth + 1,
-        content: '',
+        content,
         meta: {
           id: generateId(),
           type: 'section',
@@ -670,6 +671,43 @@ export const useStore = create<EditorState>()(
       });
       set({ tree: updated });
     }
+  },
+
+  // Insérer plusieurs sections comme enfants en une seule opération (un seul undo)
+  insertSectionsAsChildren: (parentId: string, sections: { heading: string; content: string }[]) => {
+    if (sections.length === 0) return;
+    const { tree, assessmentConfig } = get();
+
+    const childDepth = parentId === DOCUMENT_ROOT_ID
+      ? 1
+      : (() => { const p = findNodeById(tree, parentId); return p ? p.headingDepth + 1 : 1; })();
+
+    (get() as any)._pushHistory();
+
+    const newChildren: NodeData[] = sections.map(s => ({
+      id: generateId(),
+      heading: s.heading,
+      headingDepth: childDepth,
+      content: s.content,
+      meta: {
+        id: generateId(),
+        type: 'section' as const,
+        evaluation: assessmentConfig.enabled ? { ...defaultEvaluation } : undefined,
+      },
+      children: [],
+    }));
+
+    if (parentId === DOCUMENT_ROOT_ID) {
+      set({ tree: [...tree, ...newChildren] });
+      return;
+    }
+
+    const parent = findNodeById(tree, parentId);
+    if (!parent) return;
+    const updated = updateNodeInTree(tree, parentId, {
+      children: [...parent.children, ...newChildren],
+    });
+    set({ tree: updated });
   },
 
   // Supprimer un nœud

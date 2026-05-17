@@ -39,8 +39,25 @@ const promptTemplates = [
   { icon: '🔄', label: 'État/Transitions', prompt: 'Génère un diagramme Mermaid de type stateDiagram-v2 pour représenter les différents états et transitions.', category: 'mermaid' },
 ];
 
+// Extrait les sections (titre + contenu) depuis du markdown brut avec des headings.
+function extractHeadingSections(markdown: string): { heading: string; content: string }[] {
+  const sections: { heading: string; content: string }[] = [];
+  let current: { heading: string; content: string } | null = null;
+  for (const line of markdown.split('\n')) {
+    const m = line.match(/^#{1,6}\s+(.+)/);
+    if (m) {
+      if (current) sections.push({ ...current, content: current.content.trim() });
+      current = { heading: m[1].trim(), content: '' };
+    } else if (current) {
+      current.content += line + '\n';
+    }
+  }
+  if (current) sections.push({ ...current, content: current.content.trim() });
+  return sections;
+}
+
 const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) => {
-  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild, pendingAIPrompt, setPendingAIPrompt } = useStore();
+  const { getActiveNode, tree, activeNodeId, updateNodeContent, aiConfig, setChatMode, setAIConfig, addChild, insertSectionsAsChildren, pendingAIPrompt, setPendingAIPrompt } = useStore();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -336,27 +353,43 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                         {isSectionExpanded(idx, 'content') && (
                           <div className="px-3 pb-3 pt-1 animate-fade-in">
                             <p className="text-sm whitespace-pre-wrap break-words text-slate-800 leading-relaxed mb-3">{msg.parsed.content}</p>
-                            {activeNode && (
-                            <div className="flex gap-1.5">
-                              <button
-                                onClick={() => handleCommit(msg.parsed!.content, false)}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-all duration-150 active:scale-95 shadow-soft hover:shadow-soft-lg"
-                              >
-                                <Plus size={12} />
-                                Ajouter au nœud
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm('Remplacer tout le contenu du nœud ?')) {
-                                    handleCommit(msg.parsed!.content, true);
-                                  }
-                                }}
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-all duration-150 active:scale-95 shadow-soft hover:shadow-soft-lg"
-                              >
-                                ↻ Remplacer
-                              </button>
-                            </div>
-                            )}
+                            {activeNode && (() => {
+                              const headingSections = extractHeadingSections(msg.parsed!.content);
+                              return (
+                              <div className="flex flex-wrap gap-1.5">
+                                {headingSections.length > 0 ? (
+                                  <button
+                                    onClick={() => {
+                                      insertSectionsAsChildren(activeNode.id, headingSections);
+                                    }}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fuchsia-500 hover:bg-fuchsia-600 text-white text-xs font-semibold transition-all duration-150 active:scale-95 shadow-soft"
+                                    title="Chaque heading devient un nœud fils dans l'arbre"
+                                  >
+                                    <Plus size={12} />
+                                    Insérer {headingSections.length} section{headingSections.length > 1 ? 's' : ''} dans l'arbre
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleCommit(msg.parsed!.content, false)}
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold transition-all duration-150 active:scale-95 shadow-soft hover:shadow-soft-lg"
+                                  >
+                                    <Plus size={12} />
+                                    Ajouter au nœud
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    if (confirm('Remplacer tout le contenu du nœud ?')) {
+                                      handleCommit(msg.parsed!.content, true);
+                                    }
+                                  }}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition-all duration-150 active:scale-95 shadow-soft hover:shadow-soft-lg"
+                                >
+                                  ↻ Remplacer
+                                </button>
+                              </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -395,7 +428,7 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                                 <button
                                   onClick={() => {
                                     const targetId = activeNode ? activeNode.id : DOCUMENT_ROOT_ID;
-                                    addChild(targetId, sub.title);
+                                    addChild(targetId, sub.title, sub.description);
                                   }}
                                   className="flex items-center gap-1 px-2 py-1 rounded-lg bg-fuchsia-500 hover:bg-fuchsia-600 text-white text-[11px] font-semibold transition-all active:scale-95 whitespace-nowrap shadow-soft"
                                   title="Créer ce nœud enfant"
@@ -409,9 +442,11 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                               onClick={() => {
                                 if (confirm(`Créer les ${msg.parsed!.subsections.length} sous-sections ?`)) {
                                   const targetId = activeNode ? activeNode.id : DOCUMENT_ROOT_ID;
-                                  msg.parsed!.subsections.forEach(sub => {
-                                    addChild(targetId, sub.title);
-                                  });
+                                  const sections = msg.parsed!.subsections.map(sub => ({
+                                    heading: sub.title,
+                                    content: sub.description,
+                                  }));
+                                  insertSectionsAsChildren(targetId, sections);
                                 }
                               }}
                               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-semibold transition-all active:scale-95 shadow-soft hover:shadow-glow-accent"
@@ -436,14 +471,26 @@ const ChatPane: React.FC<ChatPaneProps> = ({ className = '', onOpenSettings }) =
                       >
                         {copiedId === idx ? <><Check size={11} /> Copié</> : <><Copy size={11} /> Copier</>}
                       </button>
-                      {activeNode && (
-                      <button
-                        onClick={() => handleCommit(msg.content, false)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs transition-colors"
-                      >
-                        + Ajouter
-                      </button>
-                      )}
+                      {activeNode && (() => {
+                        const headingSections = extractHeadingSections(msg.content);
+                        return headingSections.length > 0 ? (
+                          <button
+                            onClick={() => insertSectionsAsChildren(activeNode.id, headingSections)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-fuchsia-500 hover:bg-fuchsia-600 text-white text-xs transition-colors"
+                            title="Chaque heading devient un nœud fils dans l'arbre"
+                          >
+                            <Plus size={11} />
+                            {headingSections.length} section{headingSections.length > 1 ? 's' : ''} → arbre
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleCommit(msg.content, false)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs transition-colors"
+                          >
+                            + Ajouter
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
