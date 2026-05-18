@@ -209,6 +209,22 @@ describe('aiService', () => {
       expect(prompt).not.toContain('MODE STRUCTURATION');
     });
 
+    it('le mode discussion encourage l\'IA à proposer du contenu insérable', () => {
+      const context = buildContextSandwich([createTestNode()], createTestNode());
+      const prompt = buildSystemPrompt(context, 'discussion');
+      // The Discussion prompt must mention proactive content/subsection emission
+      // so that the existing one-click insertion UI gets triggered when relevant.
+      expect(prompt).toMatch(/proactivement|proposes/i);
+      expect(prompt).toContain('📝 CONTENU');
+      expect(prompt).toContain('🏗️ SOUS-SECTIONS');
+    });
+
+    it('le mode discussion rappelle d\'éviter les doublons avec l\'existant', () => {
+      const context = buildContextSandwich([createTestNode()], createTestNode());
+      const prompt = buildSystemPrompt(context, 'discussion');
+      expect(prompt).toMatch(/duplique|cohérence|existant/i);
+    });
+
     it('devrait construire un prompt système pour le mode structuration', () => {
       const context = buildContextSandwich(
         [createTestNode()],
