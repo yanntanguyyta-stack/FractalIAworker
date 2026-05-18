@@ -3,11 +3,14 @@ import {
   ChevronDown, ChevronRight, Plus, Trash2, FolderTree, Copy, ClipboardPaste,
   GripVertical, Search, Undo2, Redo2, FileText, Pencil, X, Download,
   ChevronUp as LevelUp, ChevronDown as LevelDown, Sparkles,
-  Wrench, ArrowRight, FolderOpen,
+  Wrench, ArrowRight, FolderOpen, Workflow, RefreshCw,
 } from 'lucide-react';
 import { useStore, DOCUMENT_ROOT_ID, ProjectDocument, DocumentType, MAX_DOCUMENT_NAME_LENGTH } from '../store';
 import { exportProjectToZip } from '../utils/projectExport';
+import { runSyncRule, SubsectionProposal } from '../aiService';
 import ProjectSwitcher from './ProjectSwitcher';
+import SyncRuleModal from './SyncRuleModal';
+import SyncReviewModal from './SyncReviewModal';
 import { NodeData } from '../types';
 import {
   countAllNodes,
@@ -60,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
     deleteNodes,
     documents, activeDocumentId, createDocument, switchDocument, renameDocument, deleteDocument,
     switchToAdjacentDocument, setDocumentType,
-    projects, activeProjectId,
+    projects, activeProjectId, aiConfig,
   } = useStore();
   const isDocumentRoot = activeNodeId === DOCUMENT_ROOT_ID;
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
@@ -69,6 +72,48 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
   const [renamingDocId, setRenamingDocId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState('');
   const renameInputRef = React.useRef<HTMLInputElement>(null);
+  // Sync rule UI state
+  const [syncRuleEditDoc, setSyncRuleEditDoc] = React.useState<ProjectDocument | null>(null);
+  const [syncRunningDocId, setSyncRunningDocId] = React.useState<string | null>(null);
+  const [syncReview, setSyncReview] = React.useState<{
+    targetDoc: ProjectDocument; sourceDocName: string; proposals: SubsectionProposal[];
+  } | null>(null);
+
+  const handleRunSync = async (toolDoc: ProjectDocument) => {
+    if (!toolDoc.syncRule) return;
+    const source = documents.find(d => d.id === toolDoc.syncRule!.sourceDocId);
+    if (!source) {
+      alert('Le document source de la règle de synchro est introuvable.');
+      return;
+    }
+    if (!aiConfig.apiKey) {
+      alert('Clé API manquante. Configurez votre clé IA dans les paramètres.');
+      return;
+    }
+    setSyncRunningDocId(toolDoc.id);
+    try {
+      // Make sure the latest in-progress edits of the active doc are flushed
+      // into the documents[] mirror before we read its markdown for the sync.
+      (useStore.getState() as any)._saveCurrentDocSnapshot?.();
+      const freshDocs = useStore.getState().documents;
+      const freshTool = freshDocs.find(d => d.id === toolDoc.id) ?? toolDoc;
+      const freshSource = freshDocs.find(d => d.id === source.id) ?? source;
+      const proposals = await runSyncRule({
+        sourceDocName: freshSource.name,
+        sourceMarkdown: freshSource.markdown,
+        toolDocName: freshTool.name,
+        toolMarkdown: freshTool.markdown,
+        instruction: toolDoc.syncRule.instruction,
+        config: aiConfig,
+      });
+      setSyncReview({ targetDoc: freshTool, sourceDocName: freshSource.name, proposals });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      alert('Échec de la synchro : ' + message);
+    } finally {
+      setSyncRunningDocId(null);
+    }
+  };
 
   const activeProject = projects.find(p => p.id === activeProjectId);
   const mainDoc = documents.find(d => d.type === 'main') ?? documents[0];
@@ -497,6 +542,20 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
       {showProjectSwitcher && (
         <ProjectSwitcher onClose={() => setShowProjectSwitcher(false)} />
       )}
+      {syncRuleEditDoc && (
+        <SyncRuleModal
+          doc={documents.find(d => d.id === syncRuleEditDoc.id) ?? syncRuleEditDoc}
+          onClose={() => setSyncRuleEditDoc(null)}
+        />
+      )}
+      {syncReview && (
+        <SyncReviewModal
+          targetDoc={syncReview.targetDoc}
+          sourceDocName={syncReview.sourceDocName}
+          proposals={syncReview.proposals}
+          onClose={() => setSyncReview(null)}
+        />
+      )}
 
       {/* ── En-tête projet ────────────────────────────────────────────── */}
       <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-2 border-b border-white/40 flex-shrink-0">
@@ -796,10 +855,35 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
                 ) : (
                   <span className="flex-1 text-xs font-medium text-slate-700 truncate">{doc.name}</span>
                 )}
+                {doc.syncRule && (
+                  <span
+                    className="text-violet-500 text-[10px] flex-shrink-0"
+                    title={`Synchro depuis ${documents.find(d => d.id === doc.syncRule!.sourceDocId)?.name ?? '?'}`}
+                  >
+                    ⟳
+                  </span>
+                )}
                 <span className="text-[10px] text-slate-400 font-mono flex-shrink-0">
                   {doc.tree.length > 0 ? `${countAllNodes(doc.tree)}` : '—'}
                 </span>
                 <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 flex-shrink-0 transition-opacity">
+                  {doc.syncRule && (
+                    <button
+                      onClick={e => { e.stopPropagation(); handleRunSync(doc); }}
+                      disabled={syncRunningDocId === doc.id}
+                      className="icon-btn-sm text-slate-400 hover:text-violet-600 disabled:opacity-50"
+                      title="Lancer la synchro"
+                    >
+                      <RefreshCw size={10} className={syncRunningDocId === doc.id ? 'animate-spin' : ''} />
+                    </button>
+                  )}
+                  <button
+                    onClick={e => { e.stopPropagation(); setSyncRuleEditDoc(doc); }}
+                    className={`icon-btn-sm ${doc.syncRule ? 'text-violet-500 hover:text-violet-700' : 'text-slate-400 hover:text-violet-600'}`}
+                    title={doc.syncRule ? 'Modifier la règle de synchro' : 'Configurer une règle de synchro'}
+                  >
+                    <Workflow size={10} />
+                  </button>
                   <button
                     onClick={e => { e.stopPropagation(); startRename(doc.id, doc.name); }}
                     className="icon-btn-sm text-slate-400 hover:text-accent-600"

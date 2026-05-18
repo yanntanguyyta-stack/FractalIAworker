@@ -4,6 +4,7 @@ import {
   buildSystemPrompt,
   buildUserMessage,
   callAIAPI,
+  runSyncRule,
 } from '../aiService';
 import { NodeData } from '../types';
 import { AIConfig } from '../store';
@@ -622,6 +623,92 @@ describe('aiService', () => {
       expect(result.dependencies).toHaveLength(1);
       expect(result.dependencies[0].id).toBe('deep-dep');
       expect(result.dependencies[0].heading).toBe('Deep Dependency');
+    });
+  });
+
+  describe('runSyncRule', () => {
+    const baseArgs = {
+      sourceDocName: 'Manuscrit',
+      sourceMarkdown: '# Chapitre 1\n\nAlice entre dans la pièce. Elle a les yeux verts.',
+      toolDocName: 'Personnages',
+      toolMarkdown: '',
+      instruction: 'Liste les personnages',
+      config: { provider: 'gemini', apiKey: 'k', model: 'm', chatMode: 'discussion' } as AIConfig,
+    };
+
+    it('parse une réponse SOUS-SECTIONS en propositions', async () => {
+      global.fetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          candidates: [{ content: { parts: [{ text:
+            '📣 DISCUSSION\nJ\'ai trouvé 1 personnage.\n\n🏗️ SOUS-SECTIONS\n## Alice\nYeux verts, apparaît au chapitre 1.'
+          }] } }],
+        }),
+      });
+
+      const proposals = await runSyncRule(baseArgs);
+      expect(proposals).toHaveLength(1);
+      expect(proposals[0].title).toBe('Alice');
+      expect(proposals[0].description).toContain('Yeux verts');
+    });
+
+    it('renvoie [] quand l\'IA ne propose rien', async () => {
+      global.fetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          candidates: [{ content: { parts: [{ text: '📣 DISCUSSION\nRien à ajouter.\n\n🏗️ SOUS-SECTIONS\n' }] } }],
+        }),
+      });
+      const proposals = await runSyncRule(baseArgs);
+      expect(proposals).toEqual([]);
+    });
+
+    it('passe l\'instruction et le doc outil actuel au prompt', async () => {
+      let capturedSystem = '';
+      let capturedUser = '';
+      global.fetch = vi.fn().mockImplementationOnce(async (_url: string, init: any) => {
+        const body = JSON.parse(init.body);
+        capturedSystem = body.system_instruction?.parts?.[0]?.text ?? '';
+        capturedUser = body.contents?.[0]?.parts?.[0]?.text ?? '';
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            candidates: [{ content: { parts: [{ text: '🏗️ SOUS-SECTIONS\n## X\nY' }] } }],
+          }),
+        };
+      });
+
+      await runSyncRule({
+        ...baseArgs,
+        toolMarkdown: '## Bob\nDéjà connu.',
+        instruction: 'Personnages avec leur rôle',
+      });
+
+      expect(capturedSystem).toContain('Personnages avec leur rôle');
+      expect(capturedSystem).toContain('NOUVELLES');
+      expect(capturedUser).toContain('Bob');
+      expect(capturedUser).toContain('Manuscrit');
+    });
+
+    it('tronque le markdown source quand il dépasse la limite', async () => {
+      let capturedUser = '';
+      global.fetch = vi.fn().mockImplementationOnce(async (_url: string, init: any) => {
+        const body = JSON.parse(init.body);
+        capturedUser = body.contents?.[0]?.parts?.[0]?.text ?? '';
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            candidates: [{ content: { parts: [{ text: '🏗️ SOUS-SECTIONS\n' }] } }],
+          }),
+        };
+      });
+
+      await runSyncRule({
+        ...baseArgs,
+        sourceMarkdown: 'A'.repeat(20000),
+      });
+
+      expect(capturedUser).toContain('document tronqué');
     });
   });
 });

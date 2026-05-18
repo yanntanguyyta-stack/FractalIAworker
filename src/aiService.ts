@@ -599,3 +599,67 @@ export async function callAIAPI(
     return callOpenAIAPI(systemPrompt, userMessage, config.apiKey, config.model);
   }
 }
+
+/**
+ * Lance une règle de synchro : analyse le doc source à la lumière du tool doc
+ * actuel et de l'instruction, et renvoie une liste de NOUVELLES entrées à
+ * proposer (jamais d'updates en V1). Les propositions sont parsées via le
+ * format SOUS-SECTIONS standard et passent par une étape de revue côté UI.
+ */
+export async function runSyncRule(
+  args: {
+    sourceDocName: string;
+    sourceMarkdown: string;
+    toolDocName: string;
+    toolMarkdown: string;
+    instruction: string;
+    config: AIConfig;
+  }
+): Promise<SubsectionProposal[]> {
+  const { sourceDocName, sourceMarkdown, toolDocName, toolMarkdown, instruction, config } = args;
+  // Borne le doc source pour ne pas exploser le contexte (manuscrit long).
+  const MAX_SOURCE_CHARS = 12000;
+  const sourceTrunc = sourceMarkdown.length > MAX_SOURCE_CHARS
+    ? sourceMarkdown.substring(0, MAX_SOURCE_CHARS) + '\n\n[... document tronqué ...]'
+    : sourceMarkdown;
+
+  const systemPrompt = `Tu es chargé d'enrichir un document outil ("${toolDocName}") à partir d'un document source ("${sourceDocName}"), en suivant strictement une instruction utilisateur.
+
+## INSTRUCTION UTILISATEUR
+${instruction}
+
+## RÈGLES IMPÉRATIVES
+1. Propose UNIQUEMENT des entrées NOUVELLES — ne propose JAMAIS un élément déjà présent dans le document outil actuel (regarde les titres existants).
+2. Si rien de nouveau n'est trouvé, renvoie une section SOUS-SECTIONS vide.
+3. Une proposition = un titre H2 (## ) + une description concise (2-5 lignes) fidèle au contenu du document source. N'invente rien.
+4. Respecte le ton, la longueur et le style des entrées existantes du document outil.
+
+## FORMAT DE RÉPONSE OBLIGATOIRE
+📣 DISCUSSION
+(Optionnel — bref résumé de ce que tu as trouvé.)
+
+🏗️ SOUS-SECTIONS
+## Nom de la nouvelle entrée
+Description fidèle au document source.
+
+## Autre nouvelle entrée
+Description…
+`;
+
+  const userMessage = `## DOCUMENT OUTIL ACTUEL (${toolDocName})
+
+\`\`\`markdown
+${toolMarkdown || '(vide)'}
+\`\`\`
+
+## DOCUMENT SOURCE (${sourceDocName})
+
+\`\`\`markdown
+${sourceTrunc}
+\`\`\`
+
+Applique l'instruction. Liste uniquement les NOUVELLES entrées à ajouter au document outil.`;
+
+  const raw = await callAIAPI(systemPrompt, userMessage, config);
+  return parseAIResponse(raw).subsections;
+}
