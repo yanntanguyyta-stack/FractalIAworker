@@ -5,7 +5,7 @@ import HomePage from '../components/HomePage';
 describe('HomePage', () => {
   it('devrait afficher le titre principal', () => {
     render(<HomePage onLogin={vi.fn()} onRegister={vi.fn()} />);
-    expect(screen.getByText('FractalIA')).toBeInTheDocument();
+    expect(screen.getByText('FractalIAworker')).toBeInTheDocument();
   });
 
   it('devrait afficher les boutons Se connecter et Créer un compte', () => {

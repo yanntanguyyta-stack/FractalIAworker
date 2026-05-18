@@ -306,7 +306,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
       try {
         await navigator.share({
           title: getExportTitle(),
-          text: 'Partage du document Node IA Worker',
+          text: 'Partage du document FractalIAworker',
           url: shareUrl,
         });
         return;
@@ -394,7 +394,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
                 <span className="text-white font-bold text-sm">F</span>
               </div>
               <div>
-                <h1 className="text-base font-bold accent-text-gradient tracking-tight">FractalIA</h1>
+                <h1 className="text-base font-bold accent-text-gradient tracking-tight">FractalIAworker</h1>
                 <p className="text-slate-500 text-[10px] -mt-0.5">Markdown · IA contextuelle</p>
               </div>
             </div>
@@ -484,7 +484,7 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
                 <span className="text-white font-bold text-base tracking-tight">F</span>
               </div>
               <div className="leading-tight">
-                <h1 className="text-base font-bold accent-text-gradient tracking-tight">FractalIA</h1>
+                <h1 className="text-base font-bold accent-text-gradient tracking-tight">FractalIAworker</h1>
                 <p className="text-[10px] text-slate-500 -mt-0.5">Markdown hiérarchique · IA contextuelle</p>
               </div>
             </div>

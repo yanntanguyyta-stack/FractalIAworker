@@ -353,7 +353,7 @@ export function buildWordDocument(markdown: string, title: string): string {
   <meta charset="utf-8" />
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="ProgId" content="Word.Document" />
-  <meta name="Generator" content="Node IA Worker" />
+  <meta name="Generator" content="FractalIAworker" />
   <title>${safeTitle}</title>
   <!--[if gte mso 9]><xml>
    <w:WordDocument>

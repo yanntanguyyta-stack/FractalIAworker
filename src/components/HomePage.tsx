@@ -58,7 +58,7 @@ const HomePage: React.FC<HomePageProps> = ({ onLogin, onRegister }) => {
             <span className="text-white font-bold text-lg tracking-tight">F</span>
           </div>
           <div>
-            <h1 className="text-base font-bold accent-text-gradient leading-tight tracking-tight">FractalIA</h1>
+            <h1 className="text-base font-bold accent-text-gradient leading-tight tracking-tight">FractalIAworker</h1>
             <p className="text-[10px] text-slate-500 -mt-0.5">Markdown · IA contextuelle</p>
           </div>
         </div>
@@ -85,7 +85,7 @@ const HomePage: React.FC<HomePageProps> = ({ onLogin, onRegister }) => {
           </span>
         </h2>
         <p className="text-lg text-slate-600 mb-10 max-w-2xl leading-relaxed animate-fade-in-up">
-          FractalIA est un éditeur de documents hiérarchique qui combine la puissance du Markdown
+          FractalIAworker est un éditeur de documents hiérarchique qui combine la puissance du Markdown
           avec des assistants IA (Gemini, OpenAI) pour vous aider à créer, structurer et enrichir
           vos contenus.
         </p>
@@ -128,7 +128,7 @@ const HomePage: React.FC<HomePageProps> = ({ onLogin, onRegister }) => {
 
       {/* Footer */}
       <footer className="px-6 py-6 text-center text-slate-500 text-xs">
-        FractalIA · {new Date().getFullYear()} · Architecture local-first
+        FractalIAworker · {new Date().getFullYear()} · Architecture local-first
       </footer>
     </div>
   );
