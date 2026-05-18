@@ -478,8 +478,9 @@ describe('aiService', () => {
         chatMode: 'discussion',
       };
 
+      // 401 = clé refusée, message friendly côté UI
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(
-        'Erreur Gemini'
+        /Gemini.*(refus|401)/i
       );
     });
 
@@ -498,7 +499,7 @@ describe('aiService', () => {
       };
 
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(
-        'Erreur OpenAI'
+        /OpenAI.*(refus|401)/i
       );
     });
 
@@ -572,7 +573,9 @@ describe('aiService', () => {
     });
 
     it('devrait gérer les erreurs OpenAI sans message d\'erreur détaillé', async () => {
-      global.fetch = vi.fn().mockResolvedValueOnce({
+      // 500 est transitoire → fetchWithRetry rejouera 3 fois; mockResolvedValue
+      // (pas Once) couvre toutes les tentatives.
+      global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
         json: () => Promise.reject(new Error('Parse error')),
@@ -586,9 +589,9 @@ describe('aiService', () => {
       };
 
       await expect(callAIAPI('system', 'user', config)).rejects.toThrow(
-        'Erreur HTTP 500'
+        /OpenAI.*500/
       );
-    });
+    }, 15000);
 
     it('devrait trouver une dépendance profondément imbriquée', () => {
       const deepNode = createTestNode({

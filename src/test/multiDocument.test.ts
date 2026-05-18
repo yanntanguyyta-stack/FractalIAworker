@@ -223,6 +223,53 @@ describe('multi-document — store actions', () => {
   });
 });
 
+describe('persistance — partialize', () => {
+  // Helper: dernier payload que zustand persist a tenté d'écrire dans localStorage.
+  function lastPersisted(): any {
+    const calls = (localStorage.setItem as any).mock?.calls ?? [];
+    for (let i = calls.length - 1; i >= 0; i--) {
+      if (calls[i][0] === 'irlm-ai-config') {
+        return JSON.parse(calls[i][1]);
+      }
+    }
+    return null;
+  }
+
+  function activeDocOf(persisted: any) {
+    const project = persisted.state.projects.find((p: any) => p.id === persisted.state.activeProjectId);
+    return project.documents.find((d: any) => d.id === project.activeDocumentId);
+  }
+
+  it('synchronise les éditions courantes (tree/markdown) vers projects[] avant écriture', () => {
+    useStore.getState().loadMarkdown('# Original');
+    const nodeId = useStore.getState().tree[0].id;
+    useStore.getState().updateNodeContent(nodeId, 'Contenu édité');
+
+    // Sans la consolidation dans partialize, le tree dans projects[] resterait
+    // vide à ce stade — state.tree porte bien la modification, mais projects[]
+    // ne serait synchronisé qu'au prochain _saveCurrentDocSnapshot.
+    const persisted = lastPersisted();
+    expect(persisted).toBeTruthy();
+    const activeDoc = activeDocOf(persisted);
+    expect(activeDoc.tree[0]?.content).toBe('Contenu édité');
+  });
+
+  it('ne perd pas les éditions multi-actions entre deux sérialisations', () => {
+    useStore.getState().loadMarkdown('# Doc');
+    const id = useStore.getState().tree[0].id;
+    useStore.getState().updateNodeContent(id, 'v1');
+    useStore.getState().updateNodeHeading(id, 'Renommé');
+    useStore.getState().addChild(id, 'Enfant', 'content');
+
+    const persisted = lastPersisted();
+    const activeDoc = activeDocOf(persisted);
+    expect(activeDoc.tree[0].heading).toBe('Renommé');
+    expect(activeDoc.tree[0].content).toBe('v1');
+    expect(activeDoc.tree[0].children).toHaveLength(1);
+    expect(activeDoc.tree[0].children[0].heading).toBe('Enfant');
+  });
+});
+
 describe('setSyncRule', () => {
   it('attache une règle valide à un tool doc', () => {
     useStore.getState().createDocument('Personnages');

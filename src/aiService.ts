@@ -482,6 +482,70 @@ export function buildUserMessage(context: AIContextSandwich, userQuery: string):
 }
 
 /**
+ * Statuts HTTP transitoires qui valent la peine d'être réessayés.
+ */
+const TRANSIENT_STATUSES = [429, 500, 502, 503, 504];
+
+/**
+ * Mapping modèle preview → modèle stable utilisé en cas de saturation.
+ * Les modèles preview Gemini (gemini-3-*, gemini-2.0-flash-exp) renvoient
+ * fréquemment des 503 quand la demande est forte côté Google.
+ */
+const PREVIEW_FALLBACKS: Record<string, string> = {
+  'gemini-3-pro-preview': 'gemini-1.5-pro',
+  'gemini-3-flash-preview': 'gemini-2.0-flash-exp',
+  'gemini-2.0-flash-exp': 'gemini-1.5-pro',
+};
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * Construit un message d'erreur utilisateur clair à partir d'un statut HTTP.
+ * Le body brut est gardé en log console mais pas exposé tel quel à l'utilisateur
+ * (il peut contenir des fragments de payload, du JSON technique, etc.).
+ */
+function friendlyErrorMessage(provider: 'Gemini' | 'OpenAI', model: string, status: number): string {
+  if (status === 429) {
+    return `${provider} a atteint la limite de requêtes (${status}) sur le modèle ${model}. Réessaie dans quelques instants, ou bascule sur un autre modèle.`;
+  }
+  if (status === 503) {
+    return `Le modèle ${model} est temporairement saturé côté ${provider} (${status}). Réessaie dans quelques minutes, ou choisis un autre modèle dans le sélecteur du chat.`;
+  }
+  if (status === 500 || status === 502 || status === 504) {
+    return `Erreur serveur ${provider} (${status}) sur ${model}. Le service est probablement en cours de stabilisation — réessaie dans quelques instants.`;
+  }
+  if (status === 401 || status === 403) {
+    return `Clé API ${provider} refusée (${status}). Vérifie ta clé dans les paramètres et qu'elle a accès au modèle ${model}.`;
+  }
+  if (status === 400) {
+    return `Requête refusée par ${provider} (${status}) — le modèle ${model} n'accepte peut-être pas ce contenu. Essaie un autre modèle.`;
+  }
+  return `Erreur ${provider} (${status}) sur ${model}.`;
+}
+
+/**
+ * Appelle une URL avec retry exponentiel sur les statuts transitoires.
+ * Renvoie la dernière Response (succès ou échec final).
+ */
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts: number = 3
+): Promise<Response> {
+  let response: Response | null = null;
+  for (let i = 0; i < attempts; i++) {
+    response = await fetch(url, init);
+    if (response.ok) return response;
+    if (!TRANSIENT_STATUSES.includes(response.status)) return response;
+    if (i < attempts - 1) {
+      // Backoff: 1s, 2s, 4s (peut être tuned selon les contraintes serveur)
+      await sleep(1000 * Math.pow(2, i));
+    }
+  }
+  return response!;
+}
+
+/**
  * Appeler l'API Gemini
  */
 async function callGeminiAPI(
@@ -490,48 +554,66 @@ async function callGeminiAPI(
   apiKey: string,
   model: string
 ): Promise<string> {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const endpointFor = (m: string) =>
+    `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   // Configuration spécifique pour Gemini 3
   const isGemini3 = model.includes('gemini-3');
   const temperature = isGemini3 ? 1.0 : 0.7;
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const body = JSON.stringify({
+    system_instruction: {
+      parts: [{ text: systemPrompt }],
     },
-    body: JSON.stringify({
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: userMessage }],
       },
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: userMessage }],
-        },
-      ],
-      generationConfig: {
-        temperature: temperature,
-        maxOutputTokens: 2048, // Augmenté pour Gemini 3
-      },
-    }),
+    ],
+    generationConfig: {
+      temperature,
+      maxOutputTokens: 2048,
+    },
   });
+  const init: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  };
+
+  // 1) Tentatives sur le modèle demandé avec retry exponentiel.
+  let response = await fetchWithRetry(endpointFor(model), init);
+
+  // 2) Si le modèle demandé est un preview et que l'erreur est encore
+  //    transitoire, on tente une fois sur le modèle stable de fallback.
+  if (!response.ok && TRANSIENT_STATUSES.includes(response.status) && PREVIEW_FALLBACKS[model]) {
+    const fallback = PREVIEW_FALLBACKS[model];
+    // eslint-disable-next-line no-console
+    console.warn(`Gemini: ${model} indisponible (${response.status}), bascule sur ${fallback}.`);
+    response = await fetchWithRetry(endpointFor(fallback), init);
+    if (response.ok) {
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts
+        ?.map((p: { text?: string }) => p.text || '').join('') || '';
+      if (!text.trim()) throw new Error('Réponse Gemini vide ou invalide.');
+      // Préfixe discret pour signaler le fallback dans le chat. Les modes
+      // structurés (📣 / 📝 / 🏗️) restent parseables ; le préfixe est isolé.
+      return `📣 DISCUSSION\n_(Modèle ${model} saturé — réponse générée avec ${fallback}.)_\n\n${text}`;
+    }
+  }
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Erreur Gemini (${response.status}): ${errorText}`);
+    const rawBody = await response.text().catch(() => '');
+    // eslint-disable-next-line no-console
+    console.warn(`Gemini error body (${response.status}):`, rawBody.slice(0, 500));
+    throw new Error(friendlyErrorMessage('Gemini', model, response.status));
   }
 
   const data = await response.json();
-  const text =
-    data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('') ||
-    '';
-
-  if (!text.trim()) {
-    throw new Error('Réponse Gemini vide ou invalide.');
-  }
-
+  const text = data?.candidates?.[0]?.content?.parts
+    ?.map((p: { text?: string }) => p.text || '').join('') || '';
+  if (!text.trim()) throw new Error('Réponse Gemini vide ou invalide.');
   return text;
 }
 
@@ -546,14 +628,14 @@ async function callOpenAIAPI(
 ): Promise<string> {
   const endpoint = 'https://api.openai.com/v1/chat/completions';
 
-  const response = await fetch(endpoint, {
+  const init: RequestInit = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: model,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
@@ -561,21 +643,20 @@ async function callOpenAIAPI(
       temperature: 0.7,
       max_tokens: 1024,
     }),
-  });
+  };
+
+  const response = await fetchWithRetry(endpoint, init);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData?.error?.message || `Erreur HTTP ${response.status}`;
-    throw new Error(`Erreur OpenAI: ${errorMessage}`);
+    // eslint-disable-next-line no-console
+    console.warn(`OpenAI error body (${response.status}):`, errorData);
+    throw new Error(friendlyErrorMessage('OpenAI', model, response.status));
   }
 
   const data = await response.json();
   const text = data?.choices?.[0]?.message?.content || '';
-
-  if (!text.trim()) {
-    throw new Error('Réponse OpenAI vide ou invalide.');
-  }
-
+  if (!text.trim()) throw new Error('Réponse OpenAI vide ou invalide.');
   return text;
 }
 

@@ -1324,20 +1324,39 @@ export const useStore = create<EditorState>()(
     });},
     {
       name: 'irlm-ai-config',
-      partialize: (state) => ({
-        aiConfig: state.aiConfig,
-        assessmentConfig: state.assessmentConfig,
-        // Persist projects[] with capped history to stay under localStorage quota.
-        projects: state.projects.map(p => ({
-          ...p,
-          documents: p.documents.map(d => ({
-            ...d,
-            history: d.history.slice(-MAX_PERSISTED_HISTORY),
-            future: d.future.slice(0, MAX_PERSISTED_HISTORY),
+      partialize: (state) => {
+        // Les mutations courantes (updateNodeContent, addChild, etc.) ne touchent
+        // que state.tree / state.markdown / state.history / state.future (le miroir
+        // top-level). Sans cette consolidation, ces éditions ne descendraient
+        // jamais dans projects[active].documents[active] et seraient perdues au
+        // refresh tant que l'utilisateur n'a pas switché de doc/projet.
+        const consolidatedProjects = state.projects.map(p => {
+          if (p.id !== state.activeProjectId) return p;
+          return {
+            ...p,
+            activeDocumentId: state.activeDocumentId,
+            documents: p.documents.map(d =>
+              d.id === state.activeDocumentId
+                ? { ...d, tree: state.tree, markdown: state.markdown, history: state.history, future: state.future }
+                : d
+            ),
+          };
+        });
+        return {
+          aiConfig: state.aiConfig,
+          assessmentConfig: state.assessmentConfig,
+          // Persist projects[] with capped history to stay under localStorage quota.
+          projects: consolidatedProjects.map(p => ({
+            ...p,
+            documents: p.documents.map(d => ({
+              ...d,
+              history: d.history.slice(-MAX_PERSISTED_HISTORY),
+              future: d.future.slice(0, MAX_PERSISTED_HISTORY),
+            })),
           })),
-        })),
-        activeProjectId: state.activeProjectId,
-      }),
+          activeProjectId: state.activeProjectId,
+        };
+      },
       onRehydrateStorage: () => (state) => {
         if (!state) return;
 
