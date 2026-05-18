@@ -223,6 +223,83 @@ describe('multi-document — store actions', () => {
   });
 });
 
+describe('setSyncRule', () => {
+  it('attache une règle valide à un tool doc', () => {
+    useStore.getState().createDocument('Personnages');
+    const toolId = useStore.getState().activeDocumentId;
+    const sourceId = useStore.getState().documents[0].id;
+
+    useStore.getState().setSyncRule(toolId, {
+      sourceDocId: sourceId,
+      instruction: 'Liste les personnages',
+    });
+
+    const tool = useStore.getState().documents.find(d => d.id === toolId)!;
+    expect(tool.syncRule).toEqual({
+      sourceDocId: sourceId,
+      instruction: 'Liste les personnages',
+    });
+  });
+
+  it('rejette une règle qui pointe vers soi-même', () => {
+    const id = useStore.getState().activeDocumentId;
+    useStore.getState().setSyncRule(id, { sourceDocId: id, instruction: 'x' });
+    expect(useStore.getState().documents.find(d => d.id === id)!.syncRule).toBeUndefined();
+  });
+
+  it('rejette une règle qui pointe vers un doc inexistant', () => {
+    const id = useStore.getState().activeDocumentId;
+    useStore.getState().setSyncRule(id, { sourceDocId: 'ghost', instruction: 'x' });
+    expect(useStore.getState().documents.find(d => d.id === id)!.syncRule).toBeUndefined();
+  });
+
+  it('rejette une instruction vide ou blanche', () => {
+    useStore.getState().createDocument('Other');
+    const toolId = useStore.getState().activeDocumentId;
+    const sourceId = useStore.getState().documents[0].id;
+    useStore.getState().setSyncRule(toolId, { sourceDocId: sourceId, instruction: '   ' });
+    expect(useStore.getState().documents.find(d => d.id === toolId)!.syncRule).toBeUndefined();
+  });
+
+  it('borne la longueur de l\'instruction', () => {
+    useStore.getState().createDocument('Other');
+    const toolId = useStore.getState().activeDocumentId;
+    const sourceId = useStore.getState().documents[0].id;
+    useStore.getState().setSyncRule(toolId, {
+      sourceDocId: sourceId,
+      instruction: 'x'.repeat(2000),
+    });
+    const rule = useStore.getState().documents.find(d => d.id === toolId)!.syncRule!;
+    expect(rule.instruction.length).toBeLessThanOrEqual(1000);
+  });
+
+  it('retire la règle quand on passe null', () => {
+    useStore.getState().createDocument('Other');
+    const toolId = useStore.getState().activeDocumentId;
+    const sourceId = useStore.getState().documents[0].id;
+    useStore.getState().setSyncRule(toolId, { sourceDocId: sourceId, instruction: 'x' });
+    expect(useStore.getState().documents.find(d => d.id === toolId)!.syncRule).toBeDefined();
+
+    useStore.getState().setSyncRule(toolId, null);
+    expect(useStore.getState().documents.find(d => d.id === toolId)!.syncRule).toBeUndefined();
+  });
+
+  it('deleteDocument nettoie les syncRule pointant vers le doc supprimé', () => {
+    useStore.getState().createDocument('Personnages');
+    const toolId = useStore.getState().activeDocumentId;
+    const sourceId = useStore.getState().documents[0].id;
+    useStore.getState().setSyncRule(toolId, {
+      sourceDocId: sourceId,
+      instruction: 'x',
+    });
+    // Switch off the source before deleting so deleteDocument can target it.
+    useStore.getState().switchDocument(toolId);
+    useStore.getState().deleteDocument(sourceId);
+    const tool = useStore.getState().documents.find(d => d.id === toolId)!;
+    expect(tool.syncRule).toBeUndefined();
+  });
+});
+
 describe('insertSectionsAsChildren', () => {
   it('creates N children under the target node in a single history entry', () => {
     useStore.getState().loadMarkdown('# Parent\n');

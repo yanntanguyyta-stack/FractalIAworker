@@ -344,9 +344,25 @@ En mode structuration, la section 🏗️ SOUS-SECTIONS doit être substantielle
 `;
   } else {
     prompt += `## MODE DISCUSSION
-Tu es en mode discussion. Tu peux être conversationnel et explicatif.
-La section 📣 DISCUSSION peut être plus développée.
-Les sections 📝 CONTENU et 🏗️ SOUS-SECTIONS sont optionnelles selon le contexte.
+Tu es en mode discussion. Tu réponds aux questions de l'utilisateur de façon conversationnelle et utile.
+
+**Principe directeur** : la section 📣 DISCUSSION porte la réponse à la question. Mais dès qu'un contenu insérable peut aider l'utilisateur, tu le proposes proactivement dans 📝 CONTENU et/ou 🏗️ SOUS-SECTIONS — il sera ajouté au document en un clic.
+
+**Quand remplir 📝 CONTENU** (paragraphes, descriptions, scènes, listes…) :
+- L'utilisateur demande explicitement un contenu ("écris un paragraphe sur…", "décris…", "propose une scène…")
+- L'utilisateur pose une question dont la réponse naturelle EST un bout de contenu à ajouter ("comment décrire X ?", "que pourrait dire ce personnage ?")
+- Tu identifies que le nœud actif est vide ou incomplet et que tu peux proposer une ébauche
+
+**Quand remplir 🏗️ SOUS-SECTIONS** :
+- L'utilisateur demande à étoffer/décomposer ("comment organiser…", "quels chapitres…", "propose 3 scènes…")
+- Tu identifies un manque structurel évident dans la hiérarchie actuelle
+
+**Quand laisser ces deux sections vides** :
+- Question méta sur le document ("combien de chapitres ai-je ?", "résume-moi…")
+- Discussion d'idées sans contenu prêt à insérer ("que penses-tu de…", "qu'est-ce qui marche le mieux…")
+- L'utilisateur veut explorer, pas encore écrire
+
+**Cohérence avec l'existant** : examine les SOUS-SECTIONS EXISTANTES et le DOCUMENT COMPLET avant de proposer. Ne duplique pas une section déjà présente. Respecte le ton, le vocabulaire et la profondeur hiérarchique déjà établis.
 
 `;
   }
@@ -582,4 +598,68 @@ export async function callAIAPI(
   } else {
     return callOpenAIAPI(systemPrompt, userMessage, config.apiKey, config.model);
   }
+}
+
+/**
+ * Lance une règle de synchro : analyse le doc source à la lumière du tool doc
+ * actuel et de l'instruction, et renvoie une liste de NOUVELLES entrées à
+ * proposer (jamais d'updates en V1). Les propositions sont parsées via le
+ * format SOUS-SECTIONS standard et passent par une étape de revue côté UI.
+ */
+export async function runSyncRule(
+  args: {
+    sourceDocName: string;
+    sourceMarkdown: string;
+    toolDocName: string;
+    toolMarkdown: string;
+    instruction: string;
+    config: AIConfig;
+  }
+): Promise<SubsectionProposal[]> {
+  const { sourceDocName, sourceMarkdown, toolDocName, toolMarkdown, instruction, config } = args;
+  // Borne le doc source pour ne pas exploser le contexte (manuscrit long).
+  const MAX_SOURCE_CHARS = 12000;
+  const sourceTrunc = sourceMarkdown.length > MAX_SOURCE_CHARS
+    ? sourceMarkdown.substring(0, MAX_SOURCE_CHARS) + '\n\n[... document tronqué ...]'
+    : sourceMarkdown;
+
+  const systemPrompt = `Tu es chargé d'enrichir un document outil ("${toolDocName}") à partir d'un document source ("${sourceDocName}"), en suivant strictement une instruction utilisateur.
+
+## INSTRUCTION UTILISATEUR
+${instruction}
+
+## RÈGLES IMPÉRATIVES
+1. Propose UNIQUEMENT des entrées NOUVELLES — ne propose JAMAIS un élément déjà présent dans le document outil actuel (regarde les titres existants).
+2. Si rien de nouveau n'est trouvé, renvoie une section SOUS-SECTIONS vide.
+3. Une proposition = un titre H2 (## ) + une description concise (2-5 lignes) fidèle au contenu du document source. N'invente rien.
+4. Respecte le ton, la longueur et le style des entrées existantes du document outil.
+
+## FORMAT DE RÉPONSE OBLIGATOIRE
+📣 DISCUSSION
+(Optionnel — bref résumé de ce que tu as trouvé.)
+
+🏗️ SOUS-SECTIONS
+## Nom de la nouvelle entrée
+Description fidèle au document source.
+
+## Autre nouvelle entrée
+Description…
+`;
+
+  const userMessage = `## DOCUMENT OUTIL ACTUEL (${toolDocName})
+
+\`\`\`markdown
+${toolMarkdown || '(vide)'}
+\`\`\`
+
+## DOCUMENT SOURCE (${sourceDocName})
+
+\`\`\`markdown
+${sourceTrunc}
+\`\`\`
+
+Applique l'instruction. Liste uniquement les NOUVELLES entrées à ajouter au document outil.`;
+
+  const raw = await callAIAPI(systemPrompt, userMessage, config);
+  return parseAIResponse(raw).subsections;
 }

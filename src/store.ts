@@ -36,6 +36,16 @@ interface HistorySnapshot {
 // 'main' = document principal du projet (unique), 'tool' = document outil
 export type DocumentType = 'main' | 'tool';
 
+// Règle de synchronisation : un tool doc peut être (re)peuplé automatiquement
+// à partir d'un autre document du projet via une instruction libre. Chaque
+// exécution passe par une étape de revue (jamais d'application silencieuse).
+export interface SyncRule {
+  sourceDocId: string;     // document source à analyser
+  instruction: string;     // prompt libre ("Liste les personnages avec…")
+}
+
+export const MAX_SYNC_INSTRUCTION_LENGTH = 1000;
+
 // Un document dans le projet (chaque onglet)
 export interface ProjectDocument {
   id: string;
@@ -47,6 +57,8 @@ export interface ProjectDocument {
   // IDs des autres documents à injecter en contexte IA (manuel, persisté par doc)
   contextDocIds: string[];
   type: DocumentType;
+  // Règle de synchro depuis un autre doc (tool docs uniquement, optionnel)
+  syncRule?: SyncRule;
 }
 
 // Conteneur nommé regroupant plusieurs documents
@@ -153,6 +165,7 @@ interface EditorState {
   importAsDocument: (name: string, markdown: string) => boolean;
   setDocumentContextIds: (docId: string, contextIds: string[]) => void;
   setDocumentType: (docId: string, type: DocumentType) => void;
+  setSyncRule: (docId: string, rule: SyncRule | null) => void;
 
   // Actions Projet
   createProject: (name: string) => void;
@@ -992,11 +1005,17 @@ export const useStore = create<EditorState>()(
     if (documents.length <= 1) return;
     get()._saveCurrentDocSnapshot();
     const remaining = documents.filter(d => d.id !== id);
-    const cleaned = remaining.map(d =>
-      d.contextDocIds.includes(id)
-        ? { ...d, contextDocIds: d.contextDocIds.filter(cid => cid !== id) }
-        : d
-    );
+    const cleaned = remaining.map(d => {
+      let next = d;
+      if (next.contextDocIds.includes(id)) {
+        next = { ...next, contextDocIds: next.contextDocIds.filter(cid => cid !== id) };
+      }
+      // Si le doc supprimé était la source d'une syncRule, retirer la règle.
+      if (next.syncRule?.sourceDocId === id) {
+        next = { ...next, syncRule: undefined };
+      }
+      return next;
+    });
     if (id !== activeDocumentId) {
       const updatedProjects = projects.map(p =>
         p.id === activeProjectId ? { ...p, documents: cleaned } : p
@@ -1081,6 +1100,30 @@ export const useStore = create<EditorState>()(
       ...d,
       type: d.id === docId ? type : (type === 'main' ? 'tool' : d.type),
     }));
+    const updatedProjects = projects.map(p =>
+      p.id === activeProjectId ? { ...p, documents: updatedDocs } : p
+    );
+    set({ documents: updatedDocs, projects: updatedProjects });
+  },
+
+  // Définit ou retire la règle de synchro d'un document.
+  setSyncRule: (docId: string, rule: SyncRule | null) => {
+    get()._saveCurrentDocSnapshot();
+    const { documents, projects, activeProjectId } = get();
+    // Validation : ne pas pointer vers soi-même; la source doit exister.
+    let normalized: SyncRule | undefined;
+    if (rule) {
+      if (rule.sourceDocId === docId) return;
+      if (!documents.some(d => d.id === rule.sourceDocId)) return;
+      normalized = {
+        sourceDocId: rule.sourceDocId,
+        instruction: rule.instruction.trim().slice(0, MAX_SYNC_INSTRUCTION_LENGTH),
+      };
+      if (!normalized.instruction) return;
+    }
+    const updatedDocs = documents.map(d => d.id === docId
+      ? { ...d, syncRule: normalized }
+      : d);
     const updatedProjects = projects.map(p =>
       p.id === activeProjectId ? { ...p, documents: updatedDocs } : p
     );

@@ -13,8 +13,8 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
-        name: 'FractalIA · Markdown hiérarchique & IA contextuelle',
-        short_name: 'FractalIA',
+        name: 'FractalIAworker · Markdown hiérarchique & IA contextuelle',
+        short_name: 'FractalIAworker',
         description: 'Éditeur Markdown fractal local-first avec assistants IA (Gemini, OpenAI)',
         theme_color: '#6366f1',
         background_color: '#f4f5fb',

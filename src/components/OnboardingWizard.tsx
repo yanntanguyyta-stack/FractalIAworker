@@ -22,12 +22,12 @@ interface OnboardingWizardProps {
 const steps = [
   {
     id: 'welcome',
-    title: 'Bienvenue sur FractalIA ! 🎉',
+    title: 'Bienvenue sur FractalIAworker ! 🎉',
     icon: Sparkles,
     content: (
       <div className="space-y-4">
         <p className="text-gray-600 text-lg">
-          FractalIA est un <strong>éditeur de documents intelligent</strong> qui vous aide à structurer, 
+          FractalIAworker est un <strong>éditeur de documents intelligent</strong> qui vous aide à structurer,
           rédiger et améliorer vos contenus grâce à l'IA.
         </p>
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
@@ -170,7 +170,7 @@ const steps = [
     content: (
       <div className="space-y-4">
         <p className="text-gray-600 text-lg">
-          Tout est configuré ! Vous pouvez maintenant commencer à utiliser FractalIA.
+          Tout est configuré ! Vous pouvez maintenant commencer à utiliser FractalIAworker.
         </p>
         
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
