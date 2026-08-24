@@ -288,6 +288,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
           )}
           <div
             data-node-id={node.id}
+            role="treeitem"
+            aria-selected={isSelected || isActive}
+            aria-expanded={hasChildren ? isExpanded : undefined}
             className={`group flex items-center gap-1.5 pl-2 pr-2 py-1.5 cursor-pointer rounded-xl transition-all duration-200 ease-spring border-l-2 ${
               isSelected
                 ? 'bg-accent-100/70 border-accent-500 ring-1 ring-accent-300'
@@ -764,6 +767,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '' }) => {
 
       <div
         className="flex-1 overflow-y-auto min-h-0 px-2 pb-2"
+        role="tree"
+        aria-label="Structure hiérarchique du document"
         onDragOver={rootHandlers.onDragOver}
         onDrop={rootHandlers.onDrop}
       >

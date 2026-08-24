@@ -63,6 +63,8 @@ export default defineConfig({
           if (id.includes('mammoth') || id.includes('node_modules/docx/')) return 'docx'
           if (id.includes('@clerk/')) return 'clerk'
           if (id.includes('jszip')) return 'zip'
+          if (id.includes('katex')) return 'katex'
+          if (id.includes('lucide-react')) return 'icons'
           if (
             id.includes('react-markdown') ||
             id.includes('remark-') ||

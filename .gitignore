@@ -12,3 +12,4 @@ dist/
 .turbo/
 .vercel
 .env*.local
+coverage/

@@ -11,6 +11,7 @@ import OnboardingWizard from './OnboardingWizard';
 import ImportWizard from './ImportWizard';
 import AdminDashboard from './AdminDashboard';
 import DocumentManager from './DocumentManager';
+import ErrorBoundary from './ErrorBoundary';
 import { Download, Upload, RefreshCw, Settings, FilePlus, Share2, FileText, FileCode, ChevronDown, Printer, HelpCircle, LogOut, Shield, User, FolderOpen, Menu, X } from 'lucide-react';
 import { buildHtmlDocument, buildPrintHtmlDocument, buildWordDocument, decodeMarkdownFromShare, encodeMarkdownForShare, importFileToMarkdown } from '../utils/documentConversion';
 import { buildDocxBlob } from '../utils/docxExport';
@@ -603,7 +604,9 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
             className="h-full glass-panel rounded-2xl overflow-hidden flex flex-col flex-shrink-0"
             style={{ width: `calc(${sidebarWidth}% - 0.375rem)` }}
           >
-            <Sidebar />
+            <ErrorBoundary>
+              <Sidebar />
+            </ErrorBoundary>
           </div>
 
           {/* Séparateur 1 */}
@@ -619,7 +622,9 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
             className="h-full glass-panel rounded-2xl overflow-hidden flex flex-col flex-shrink-0"
             style={{ width: `calc(${editorWidth}% - 0.375rem)` }}
           >
-            <EditorPane />
+            <ErrorBoundary>
+              <EditorPane />
+            </ErrorBoundary>
           </div>
 
           {/* Séparateur 2 */}
@@ -632,7 +637,9 @@ const App: React.FC<AppProps> = ({ className = '' }) => {
 
           {/* Colonne Droite - Chat IA */}
           <div className="h-full glass-panel rounded-2xl overflow-hidden flex flex-col flex-1">
-            <ChatPane onOpenSettings={() => setSettingsOpen(true)} />
+            <ErrorBoundary>
+              <ChatPane onOpenSettings={() => setSettingsOpen(true)} />
+            </ErrorBoundary>
           </div>
         </div>
       )}
